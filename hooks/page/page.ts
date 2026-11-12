@@ -285,6 +285,46 @@ code.v,.loc,.idtag,.step .at{font-variant-ligatures:none}
 .tool .th span{font-size:13px;color:var(--muted)}
 pre.pre{margin:0;padding:12px 14px;font:12px/1.6 var(--f-mono);overflow-x:auto;white-space:pre-wrap;color:var(--text);border-top:1px solid var(--border)}
 
+.rowwrap{display:flex;align-items:center;gap:10px}
+.rowwrap .row{flex:1;min-width:0}
+.pick{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border2);display:grid;place-items:center;flex:none;cursor:pointer;color:var(--on-accent);background:var(--surface);transition:background .15s,border-color .15s}
+.pick:hover{border-color:var(--sugg)}
+.pick[aria-checked="true"]{background:var(--sugg);border-color:var(--sugg)}
+.bulk{border:1px solid var(--sugg-line);background:var(--sugg-soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.brow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bcount{font-weight:600}
+.bcount .mono{font-weight:500;font-size:12px;color:var(--muted)}
+.bhint{font-size:12.5px;color:var(--muted)}
+.btn.on{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok)}
+.ask textarea{display:block;min-height:42px;max-height:160px;resize:none;padding:10px 14px;font-size:14px;line-height:1.5;border-radius:12px}
+.askbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+.deep{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none}
+.deep input{accent-color:var(--sugg);margin:0}
+.askhint{font-size:12px;color:var(--faint)}
+.chat .tx p{margin:0 0 6px}
+.chat .tx p:last-child{margin:0}
+.code .bar{flex-wrap:wrap}
+.code .bar .path{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.code .modes{display:inline-flex;gap:2px;background:#1f2124;border-radius:7px;padding:2px}
+.code .cm{font:11px var(--f-ui);color:#7a7e85;padding:3px 8px;border-radius:5px;transition:background .15s,color .15s}
+.code .cm:hover:not(:disabled){color:#dfe1e5}
+.code .cm[aria-pressed="true"]{background:#2b2d30;color:#dfe1e5}
+.code .cm:disabled{opacity:.4}
+.code .cnote{padding:6px 12px;font:12px var(--f-ui);color:#7a7e85;border-bottom:1px solid var(--ed-line)}
+.code .lines.two{overflow-x:hidden;padding:0}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%}
+.srow .half{display:grid;grid-template-columns:40px 16px minmax(0,1fr);min-width:0;white-space:pre-wrap;word-break:break-all}
+.srow .half+.half{border-left:1px solid var(--ed-line)}
+.srow .no{color:var(--ed-dim);text-align:right;padding-right:6px;user-select:none}
+.srow .m{text-align:center;color:var(--ed-dim);user-select:none}
+.srow .half.del{background:rgba(247,84,100,.12)} .srow .half.del .m{color:var(--ed-del)}
+.srow .half.add{background:rgba(115,176,10,.12)} .srow .half.add .m{color:var(--ed-add)}
+.srow .half.none{background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(255,255,255,.025) 6px 12px)}
+.srow.hunk{display:block;color:#6f737a;background:rgba(86,168,245,.07);font-style:italic;padding:0 12px}
+.srow.head{font:600 10.5px var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:#7a7e85;border-bottom:1px solid var(--ed-line)}
+.srow.head .half{display:block;padding:5px 12px}
+.srow.fold{display:flex;align-items:center;justify-content:center;gap:6px;color:#7a7e85;background:rgba(255,255,255,.03);font:12px var(--f-ui);padding:4px;border-block:1px solid var(--ed-line)}
+.srow.fold:hover{color:#dfe1e5}
 @media (max-width:980px){.layout{grid-template-columns:minmax(220px,250px) minmax(0,1fr);gap:20px}}
 @media (max-width:760px){
   .wrap{padding-left:16px;padding-right:16px}
@@ -459,6 +499,70 @@ var TEXTS = {
   }
 }
 
+var MORE = {
+  ru: {
+    discussion: 'Обсуждение', askPh: 'Спроси про находку или решение…', askSend: 'Спросить', deep: 'С доступом к коду',
+    sideHint: 'Ответ придёт сюда, в чат ничего не уйдёт', deepHint: 'Вопрос уйдёт в чат сессии: Claude прочитает код и ответит сюда',
+    thinking: 'Claude думает над ответом…', askingDeep: 'Вопрос ушёл в сессию, Claude читает код…', viaSide: 'сбоку', viaSession: 'с кодом',
+    mode: { unified: 'Одна колонка', split: 'Две колонки', full: 'Файл целиком' }, noFull: 'Дифф не ложится на файл на диске (или файл не прочитан), поэтому файл целиком не показан.',
+    fold: function (n) { return 'Ещё ' + n + ' строк без изменений' }, beforeLbl: 'Было', afterLbl: 'Стало', fileAt: 'файл на момент, когда решение было предложено',
+    pickAll: 'Выбрать все', picked: function (n) { return 'Выбрано: ' + n }, prepareN: 'Подготовить решения', unpick: 'Снять выбор',
+    approve: 'Одобрить', unapprove: 'Снять одобрение', approvedChip: 'Одобрено', approvedN: function (n) { return 'Одобрено решений: ' + n }, applyApproved: 'Применить одобренные',
+    bulkHint: 'Claude предложит решение для каждой отмеченной, отдельно в её карточке. Код не меняется.',
+    approveHint: 'Одобренные применяются одним сообщением, по очереди.',
+    seesLbl: 'Что уйдёт Claude с твоим следующим сообщением', seesHint: 'Изменения уходят один раз; списки «не проблема» и «отложены» — с каждым сообщением.', seesNone: '(ничего: изменений нет, закрытых и отложенных нет)',
+    newsHead: 'Страница «Находки», что пользователь сделал там с прошлого сообщения:',
+    newsWhat: { dismiss: 'закрыта как «не проблема»', defer: 'отложена', restore: 'возвращена в работу', cancel: 'предложенное решение отменено, по нему ничего не меняй', clear: 'убрана со страницы (была закрыта)', ask: 'вопрос сбоку от чата' },
+    standingDismissed: function (ids) { return 'Пользователь закрыл как «не проблема», не поднимай их как проблему снова: ' + ids + '.' },
+    standingDeferred: function (ids) { return 'Отложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: ' + ids + '.' },
+    rule: ['Две и больше находок (ревью, аудит, расследование) Claude показывает здесь через <code>report</code>, а не списком в чате.', 'Каждую объясняет для человека, не читавшего код: без имён классов, с примером из 3–6 шагов с конкретными значениями и шагом, где ломается.', 'Не меняет код, пока ты не нажал «Применить» или «Применить одобренные». После правки проверяет и только тогда вызывает <code>mark_fixed</code>.', 'Вопрос «с доступом к коду» Claude читает в сессии и отвечает сюда через <code>reply</code>.', 'Что ты сделал на странице без сообщения (не проблема, отложить, вернуть, отмена решения), уходит Claude с твоим следующим сообщением.'],
+    tools: [['report', 'Показать находки или новое объяснение существующей.'], ['propose_fix', 'Показать решение в карточке. Код не меняется, пока ты не нажмёшь «Применить».'], ['mark_fixed', 'Отметить находку исправленной: только после «Применить», правки и проверки.'], ['reply', 'Ответить на вопрос «с доступом к коду» в обсуждении карточки.']],
+    toolsLbl: 'Четыре инструмента',
+    moment: { reported: 'Нашёл', simpler: 'Не понял, проще', example: 'Другой пример', explained: 'Новое объяснение', fix: 'Чинить', another: 'Другой вариант', proposed: 'Решение', approve: 'Одобрил', unapprove: 'Снял одобрение', apply: 'Применить', fixed: 'Исправлено и проверено', defer: 'Отложил', dismiss: 'Не проблема', restore: 'Вернул в работу', cancel: 'Отменил', discuss: 'Обсудить в чате', ask: 'Вопрос', answered: 'Ответ', clear: 'Убрал со страницы' }
+  },
+  en: {
+    discussion: 'Discussion', askPh: 'Ask about the finding or the solution…', askSend: 'Ask', deep: 'With access to the code',
+    sideHint: 'The answer comes here, nothing goes to the chat', deepHint: 'The question goes to the session chat: Claude reads the code and answers here',
+    thinking: 'Claude is thinking…', askingDeep: 'The question went to the session, Claude is reading the code…', viaSide: 'beside', viaSession: 'with code',
+    mode: { unified: 'One column', split: 'Two columns', full: 'Whole file' }, noFull: 'The diff does not fit the file on disk (or the file was not read), so the whole file is not shown.',
+    fold: function (n) { return n + ' more unchanged lines' }, beforeLbl: 'Before', afterLbl: 'After', fileAt: 'the file as it was when the solution was proposed',
+    pickAll: 'Select all', picked: function (n) { return n + ' selected' }, prepareN: 'Prepare solutions', unpick: 'Clear selection',
+    approve: 'Approve', unapprove: 'Withdraw approval', approvedChip: 'Approved', approvedN: function (n) { return n + ' approved' }, applyApproved: 'Apply approved',
+    bulkHint: 'Claude proposes a solution for each selected finding, in its own card. No code changes.',
+    approveHint: 'Approved solutions are applied in one message, one by one.',
+    seesLbl: 'What goes to Claude with your next message', seesHint: 'Changes go once; the "not a problem" and "set aside" lists go with every message.', seesNone: '(nothing: no changes, nothing closed or set aside)',
+    newsHead: 'Findings page, what the user did there since their last message:',
+    newsWhat: { dismiss: 'closed as "not a problem"', defer: 'set aside', restore: 'reopened', cancel: 'the proposed solution is cancelled, change nothing for it', clear: 'removed from the page (it was closed)', ask: 'asked beside the chat' },
+    standingDismissed: function (ids) { return 'Closed by the user as "not a problem", do not raise them as problems again: ' + ids + '.' },
+    standingDeferred: function (ids) { return 'Set aside by the user, do not fix or raise them until the user brings them back: ' + ids + '.' },
+    rule: ['Two or more findings (a review, an audit, an investigation) go here through <code>report</code>, not as a list in chat.', 'Each one is explained for a person who has not read the code: no class names, an example of 3–6 steps with concrete values, and the step where it breaks.', 'No code changes until you press "Apply" or "Apply approved". After the edit Claude checks it, and only then calls <code>mark_fixed</code>.', 'A question "with access to the code" is read in the session, and Claude answers here through <code>reply</code>.', 'What you do on the page without a message (not a problem, set aside, reopen, cancel a solution) goes to Claude with your next message.'],
+    tools: [['report', 'Show findings, or a new explanation of one.'], ['propose_fix', 'Show a solution in the card. No code changes until you press "Apply".'], ['mark_fixed', 'Mark a finding fixed: only after "Apply", the edit and a check.'], ['reply', 'Answer a question "with access to the code" in the card\'s discussion.']],
+    toolsLbl: 'Four tools',
+    moment: { reported: 'Found it', simpler: 'Simpler, please', example: 'Another example', explained: 'New explanation', fix: 'Fix', another: 'Another option', proposed: 'Solution', approve: 'Approved', unapprove: 'Withdrew approval', apply: 'Apply', fixed: 'Fixed and checked', defer: 'Set aside', dismiss: 'Not a problem', restore: 'Reopened', cancel: 'Cancelled', discuss: 'Discuss in chat', ask: 'Question', answered: 'Answer', clear: 'Removed from the page' }
+  },
+  uk: {
+    discussion: 'Обговорення', askPh: 'Запитай про знахідку чи рішення…', askSend: 'Запитати', deep: 'З доступом до коду',
+    sideHint: 'Відповідь прийде сюди, у чат нічого не піде', deepHint: 'Питання піде в чат сесії: Claude прочитає код і відповість сюди',
+    thinking: 'Claude думає над відповіддю…', askingDeep: 'Питання пішло в сесію, Claude читає код…', viaSide: 'збоку', viaSession: 'з кодом',
+    mode: { unified: 'Одна колонка', split: 'Дві колонки', full: 'Файл повністю' }, noFull: 'Диф не лягає на файл на диску (або файл не прочитано), тому файл повністю не показано.',
+    fold: function (n) { return 'Ще ' + n + ' рядків без змін' }, beforeLbl: 'Було', afterLbl: 'Стало', fileAt: 'файл на момент, коли рішення запропоновано',
+    pickAll: 'Вибрати всі', picked: function (n) { return 'Вибрано: ' + n }, prepareN: 'Підготувати рішення', unpick: 'Зняти вибір',
+    approve: 'Схвалити', unapprove: 'Зняти схвалення', approvedChip: 'Схвалено', approvedN: function (n) { return 'Схвалено рішень: ' + n }, applyApproved: 'Застосувати схвалені',
+    bulkHint: 'Claude запропонує рішення для кожної позначеної, окремо в її картці. Код не змінюється.',
+    approveHint: 'Схвалені застосовуються одним повідомленням, по черзі.',
+    seesLbl: 'Що піде Claude з твоїм наступним повідомленням', seesHint: 'Зміни йдуть один раз; списки «не проблема» і «відкладені» — з кожним повідомленням.', seesNone: '(нічого: змін немає, закритих і відкладених немає)',
+    newsHead: 'Сторінка «Знахідки», що користувач зробив там з минулого повідомлення:',
+    newsWhat: { dismiss: 'закрита як «не проблема»', defer: 'відкладена', restore: 'повернута в роботу', cancel: 'запропоноване рішення скасовано, нічого за ним не змінюй', clear: 'прибрана зі сторінки (була закрита)', ask: 'питання збоку від чату' },
+    standingDismissed: function (ids) { return 'Користувач закрив як «не проблема», не піднімай їх як проблему знову: ' + ids + '.' },
+    standingDeferred: function (ids) { return 'Відкладені користувачем, не лагодь і не піднімай їх, доки він сам їх не поверне: ' + ids + '.' },
+    rule: ['Дві й більше знахідок (рев’ю, аудит, розслідування) Claude показує тут через <code>report</code>, а не списком у чаті.', 'Кожну пояснює для людини, яка не читала код: без імен класів, з прикладом із 3–6 кроків з конкретними значеннями й кроком, де ламається.', 'Не змінює код, доки ти не натиснув «Застосувати» чи «Застосувати схвалені». Після правки перевіряє й лише тоді викликає <code>mark_fixed</code>.', 'Питання «з доступом до коду» Claude читає в сесії й відповідає сюди через <code>reply</code>.', 'Що ти зробив на сторінці без повідомлення (не проблема, відкласти, повернути, скасування рішення), іде Claude з твоїм наступним повідомленням.'],
+    tools: [['report', 'Показати знахідки або нове пояснення існуючої.'], ['propose_fix', 'Показати рішення в картці. Код не змінюється, доки ти не натиснеш «Застосувати».'], ['mark_fixed', 'Позначити знахідку виправленою: лише після «Застосувати», правки й перевірки.'], ['reply', 'Відповісти на питання «з доступом до коду» в обговоренні картки.']],
+    toolsLbl: 'Чотири інструменти',
+    moment: { reported: 'Знайшов', simpler: 'Не зрозумів, простіше', example: 'Інший приклад', explained: 'Нове пояснення', fix: 'Лагодити', another: 'Інший варіант', proposed: 'Рішення', approve: 'Схвалив', unapprove: 'Зняв схвалення', apply: 'Застосувати', fixed: 'Виправлено й перевірено', defer: 'Відклав', dismiss: 'Не проблема', restore: 'Повернув у роботу', cancel: 'Скасував', discuss: 'Обговорити в чаті', ask: 'Питання', answered: 'Відповідь', clear: 'Прибрав зі сторінки' }
+  }
+}
+Object.keys(MORE).forEach(function (lang) { Object.assign(TEXTS[lang], MORE[lang]) })
+
 var SEVG = { high: '▲', medium: '◆', low: '●' }
 var SEVO = { high: 0, medium: 1, low: 2 }
 var SEVC = { high: ['var(--hi)', 'var(--hi-soft)'], medium: ['var(--warn)', 'var(--warn-soft)'], low: ['var(--lo)', 'var(--lo-soft)'] }
@@ -482,8 +586,11 @@ var I = {
 }
 function icon(name, size) { var s = String(size || 15); return I[name].replace(/width="\d+" height="\d+"/, 'width="' + s + '" height="' + s + '"') }
 
-var state = { findings: [], branch: '', events: [], updatedAt: 0 }
-var S = { tab: 'open', sel: { open: null, deferred: null, closed: null }, sev: 'all', q: '', drawer: false, keysOpen: false }
+var state = { findings: [], branch: '', events: [], news: [], updatedAt: 0 }
+function storedMode() { try { var m = localStorage.getItem('findings.codeMode'); return m === 'split' || m === 'full' ? m : 'unified' } catch (e) { return 'unified' } }
+var S = { tab: 'open', sel: { open: null, deferred: null, closed: null }, sev: 'all', q: '', drawer: false, keysOpen: false, picked: {}, unfolded: {}, codeMode: storedMode() }
+/** Questions being typed, per finding, with the "with access to the code" switch. */
+var asks = {}
 /** Per finding: the explanation and solution shown, and how many of each the person has already seen (a new one is shown at once). */
 var view = {}
 var notes = {}
@@ -572,6 +679,7 @@ function langOf(path) {
   return EXT[ext] || 'text'
 }
 var shiki = { state: 'loading', hl: null, langs: null, loaded: {} }
+/** Highlighted lines: for a diff, one entry per non-header line; for a whole file, { left, right } per side. */
 var painted = {}
 function codeKey(change) { return change.path + '\n' + change.diff }
 function bodyOf(diff) { return diff.split('\n').filter(function (l) { return l.slice(0, 2) !== '@@' }).map(function (l) { return l.slice(1) }).join('\n') }
@@ -582,31 +690,128 @@ function tokenHTML(t) {
   if (t.fontStyle & 4) st += ';text-decoration:underline'
   return '<span style="' + st + '">' + esc(t.content) + '</span>'
 }
+function tokenize(text, lang) { return shiki.hl.codeToTokensBase(text, { lang: lang, theme: window.FINDINGS_THEME.name }).map(function (line) { return line.map(tokenHTML).join('') }) }
 function highlight(change) {
-  var key = codeKey(change)
-  if (painted[key]) return Promise.resolve()
-  var lang = langOf(change.path)
+  var key = codeKey(change), lang = langOf(change.path)
+  var needFull = !!change.full && painted['F' + key] === undefined
+  if (painted[key] !== undefined && !needFull) return Promise.resolve()
   if (shiki.state !== 'ready' || lang === 'text' || !shiki.langs[lang]) return Promise.resolve()
   var load = shiki.loaded[lang] || (shiki.loaded[lang] = shiki.hl.loadLanguage(shiki.langs[lang]))
   return load.then(function () {
-    var lines = shiki.hl.codeToTokensBase(bodyOf(change.diff), { lang: lang, theme: window.FINDINGS_THEME.name })
-    painted[key] = lines.map(function (line) { return line.map(tokenHTML).join('') })
-  }).catch(function () { painted[key] = null })
+    if (painted[key] === undefined) painted[key] = tokenize(bodyOf(change.diff), lang)
+    if (needFull) { var m = fullModel(change); painted['F' + key] = { left: tokenize(m.left.join('\n'), lang), right: tokenize(m.right.join('\n'), lang) } }
+  }).catch(function () { painted[key] = null; painted['F' + key] = null })
 }
 function allChanges() { var out = []; state.findings.forEach(function (f) { f.fixes.forEach(function (x) { x.changes.forEach(function (c) { out.push(c) }) }) }); return out }
 function highlightAll() { return Promise.all(allChanges().map(highlight)) }
-function codeHTML(change) {
-  var colored = painted[codeKey(change)] || null
+
+/** The hunks of a diff: each with its old and new starting line numbers, as the header gives them. */
+function hunksOf(diff) {
+  var hunks = []
+  diff.split('\n').forEach(function (l) {
+    if (l.slice(0, 2) === '@@') { var m = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l); hunks.push({ head: l, old: m ? Number(m[1]) : 1, now: m ? Number(m[2]) : 1, lines: [] }); return }
+    if (!hunks.length) hunks.push({ head: '', old: 1, now: 1, lines: [] })
+    hunks[hunks.length - 1].lines.push(l)
+  })
+  return hunks
+}
+/** A run of removed lines then a run of added ones, paired row by row; context lines stand on both sides. */
+function pairRows(lines, onContext, onChange) {
+  var j = 0
+  while (j < lines.length) {
+    var c = lines[j].charAt(0)
+    if (c !== '-' && c !== '+') { onContext(lines[j], j); j++; continue }
+    var dels = [], adds = []
+    while (j < lines.length && lines[j].charAt(0) === '-') { dels.push(j); j++ }
+    while (j < lines.length && lines[j].charAt(0) === '+') { adds.push(j); j++ }
+    for (var k = 0; k < Math.max(dels.length, adds.length); k++) onChange(k < dels.length ? dels[k] : null, k < adds.length ? adds[k] : null)
+  }
+}
+/** The whole file before and after the solution, row by row: unchanged lines on both sides, changed ones paired. */
+function fullModel(change) {
+  var left = change.full.before === '' ? [] : change.full.before.replace(/\r/g, '').split('\n')
+  var right = [], rows = [], bi = 0
+  function same(n) { for (var k = 0; k < n && bi < left.length; k++) { rows.push({ l: bi, r: right.length }); right.push(left[bi]); bi++ } }
+  hunksOf(change.diff).forEach(function (h, i) {
+    same((change.full.starts[i] || 0) - bi)
+    pairRows(h.lines, function () { rows.push({ l: bi, r: right.length }); right.push(left[bi]); bi++ }, function (d, a) {
+      var row = { l: null, r: null, ch: true }
+      if (d !== null) { row.l = bi; bi++ }
+      if (a !== null) { row.r = right.length; right.push(h.lines[a].slice(1)) }
+      rows.push(row)
+    })
+  })
+  same(left.length - bi)
+  return { left: left, right: right, rows: rows }
+}
+function cell(num, mark, cls, html) {
+  return '<div class="half ' + cls + '"><span class="no">' + (num === null ? '' : num) + '</span><span class="m">' + mark + '</span><span class="c">' + html + '</span></div>'
+}
+function unifiedHTML(change, colored) {
   var row = 0
-  var lines = change.diff.split('\n').map(function (l, i) {
+  return change.diff.split('\n').map(function (l) {
     if (l.slice(0, 2) === '@@') return '<div class="ln hunk"><span class="m"></span><span>' + esc(l) + '</span></div>'
     var m = l.charAt(0), cls = m === '+' ? 'add' : m === '-' ? 'del' : ''
     var body = colored && colored[row] != null ? colored[row] : '<span class="c">' + esc(l.slice(1)) + '</span>'
     row++
     return '<div class="ln ' + cls + '"><span class="m">' + (m === '+' ? '+' : m === '-' ? '−' : '') + '</span><span>' + (body || ' ') + '</span></div>'
   }).join('')
-  var lang = langOf(change.path)
-  return '<div class="code" data-key="code-' + esc(codeKey(change).length + ':' + change.path) + '"><div class="bar">' + icon('code', 13) + esc(change.path) + '<span class="lang">' + esc(lang) + '</span></div><div class="lines">' + lines + '</div></div>'
+}
+function splitHTML(change, colored) {
+  var out = '', base = 0
+  hunksOf(change.diff).forEach(function (h) {
+    var ln = h.old, rn = h.now, offset = base
+    if (h.head) out += '<div class="srow hunk"><span>' + esc(h.head) + '</span></div>'
+    var html = function (j) { return colored && colored[offset + j] != null ? colored[offset + j] || ' ' : esc(h.lines[j].slice(1)) || ' ' }
+    pairRows(h.lines, function (l, j) {
+      out += '<div class="srow">' + cell(ln++, '', '', html(j)) + cell(rn++, '', '', html(j)) + '</div>'
+    }, function (d, a) {
+      out += '<div class="srow">' + (d === null ? cell(null, '', 'none', '') : cell(ln++, '−', 'del', html(d))) + (a === null ? cell(null, '', 'none', '') : cell(rn++, '+', 'add', html(a))) + '</div>'
+    })
+    base += h.lines.length
+  })
+  return out
+}
+var CONTEXT = 3
+function fullHTML(change, key) {
+  var t = T(), m = fullModel(change), colored = painted['F' + codeKey(change)] || null
+  var side = function (which, i) { return i === null ? '' : colored && colored[which][i] != null ? colored[which][i] || ' ' : esc(m[which][i]) || ' ' }
+  var out = '<div class="srow head"><div class="half">' + esc(t.beforeLbl) + '</div><div class="half">' + esc(t.afterLbl) + '</div></div>'
+  var rows = m.rows, i = 0
+  while (i < rows.length) {
+    if (!rows[i].ch) {
+      var j = i
+      while (j < rows.length && !rows[j].ch) j++
+      var hidden = j - i - (i === 0 ? 0 : CONTEXT) - (j === rows.length ? 0 : CONTEXT)
+      var foldKey = key + ':' + i
+      if (hidden > 3 && !S.unfolded[foldKey]) {
+        var showTop = i === 0 ? 0 : CONTEXT, showBottom = j === rows.length ? 0 : CONTEXT
+        for (var a = i; a < i + showTop; a++) out += plainRow(rows[a], side)
+        out += '<button class="srow fold" type="button" data-unfold="' + esc(foldKey) + '" data-key="fold-' + esc(foldKey) + '">' + icon('chev', 13) + esc(t.fold(hidden)) + '</button>'
+        for (var b = j - showBottom; b < j; b++) out += plainRow(rows[b], side)
+      } else {
+        for (var c = i; c < j; c++) out += plainRow(rows[c], side)
+      }
+      i = j
+      continue
+    }
+    var r = rows[i]
+    out += '<div class="srow">' + (r.l === null ? cell(null, '', 'none', '') : cell(r.l + 1, '−', 'del', side('left', r.l))) + (r.r === null ? cell(null, '', 'none', '') : cell(r.r + 1, '+', 'add', side('right', r.r))) + '</div>'
+    i++
+  }
+  return out
+}
+function plainRow(r, side) { return '<div class="srow">' + cell(r.l + 1, '', '', side('left', r.l)) + cell(r.r + 1, '', '', side('right', r.r)) + '</div>' }
+function codeHTML(change, findingId) {
+  var t = T(), lang = langOf(change.path), key = findingId + ':' + change.path
+  var mode = S.codeMode === 'full' && !change.full ? 'split' : S.codeMode
+  var colored = painted[codeKey(change)] || null
+  var modes = ['unified', 'split', 'full'].map(function (m) {
+    return '<button class="cm" type="button" data-mode="' + m + '" aria-pressed="' + (S.codeMode === m) + '"' + (m === 'full' && !change.full ? ' disabled title="' + esc(t.noFull) + '"' : '') + '>' + esc(t.mode[m]) + '</button>'
+  }).join('')
+  var body = mode === 'unified' ? '<div class="lines">' + unifiedHTML(change, colored) + '</div>' : mode === 'split' ? '<div class="lines two">' + splitHTML(change, colored) + '</div>' : '<div class="lines two">' + fullHTML(change, key) + '</div>'
+  var note = S.codeMode === 'full' && !change.full ? '<div class="cnote">' + esc(t.noFull) + '</div>' : mode === 'full' ? '<div class="cnote">' + esc(t.fileAt) + '</div>' : ''
+  return '<div class="code" data-key="code-' + esc(key) + '-' + mode + '"><div class="bar">' + icon('code', 13) + '<span class="path">' + esc(change.path) + '</span><span class="lang">' + esc(lang) + '</span><span class="modes">' + modes + '</span></div>' + note + body + '</div>'
 }
 window.addEventListener('findings:shiki', function () {
   var s = window.findingsShiki
@@ -618,6 +823,14 @@ if (window.findingsShiki !== undefined) window.dispatchEvent(new Event('findings
 
 /* ---------- drawing ---------- */
 function sevChip(s) { return '<span class="chip" style="color:' + SEVC[s][0] + ';background:' + SEVC[s][1] + '"><span class="mono g-' + s + '">' + SEVG[s] + '</span>' + esc(T().sev[s]) + '</span>' }
+/** Text Claude wrote: blank lines split paragraphs, backticks and double braces set code and values apart. */
+function rich(s) {
+  return String(s).split(/\n\s*\n/).map(function (p) { return '<p>' + vals(p).replace(/\x60([^\x60]+)\x60/g, '<code class="v">$1</code>').replace(/\n/g, '<br>') + '</p>' }).join('')
+}
+function canPick(f) { return groupOf(f) !== 'closed' }
+function pickedIds() { return Object.keys(S.picked).filter(function (id) { var f = byId(id); return S.picked[id] && f && canPick(f) }) }
+function approvedIds() { return state.findings.filter(function (f) { return f.status === 'proposed' && f.approved !== null }).map(function (f) { return f.id }) }
+function pickBox(f) { return canPick(f) ? '<span class="pick" role="checkbox" tabindex="0" data-pick="' + f.id + '" aria-checked="' + !!S.picked[f.id] + '">' + (S.picked[f.id] ? icon('check', 11) : '') + '</span>' : '' }
 
 function renderHeader() {
   var t = T()
@@ -664,14 +877,16 @@ function stepsHTML(steps, mode) {
     return '<li class="step ' + cls + '"><span class="k">' + (i + 1) + '</span><div class="tx">' + flag + (s.at ? '<span class="at">' + esc(s.at) + '</span>' : '') + vals(s.text) + '</div></li>'
   }).join('') + '</ol>'
 }
-function typing(text) { return '<div class="typing"><span class="av c">' + I.claude + '</span><span class="bub"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>' + esc(text) + '</span></div>' }
+function typing(text) { return '<div class="typing" data-key="typing"><span class="av c">' + I.claude + '</span><span class="bub"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>' + esc(text) + '</span></div>' }
 function originLabel(f, i) { var t = T(), o = f.versions[i].origin; return i === 0 ? t.origin.first : t.origin[o] || t.origin.claude }
 
 function rowHTML(f) {
   var t = T(), closed = groupOf(f) === 'closed'
   var lead = closed ? '<span class="ok">' + (f.status === 'fixed' ? icon('check', 12) : icon('x', 11)) + '</span>' : '<span class="g g-' + f.severity + '" title="' + esc(t.sev[f.severity]) + '">' + SEVG[f.severity] + '</span>'
-  var tag = !closed && f.status === 'proposed' ? '<span class="chip" style="color:var(--claude);background:var(--claude-soft)">' + esc(t.hasFix) + '</span>' : f.isCarried ? '<span class="chip" style="color:var(--sugg);background:var(--sugg-soft)">' + esc(t.carried) + '</span>' : ''
-  return '<button class="row' + (closed ? ' closed' : '') + '" type="button" data-key="row-' + f.id + '" data-sel="' + f.id + '" aria-label="' + esc(t.open + ' ' + f.id) + '">' + lead + '<span class="id">' + f.id + '</span><span class="tt">' + esc(f.title) + '</span>' + tag + '<span class="lc">' + esc(f.where) + '</span><span style="color:var(--faint);display:flex">' + I.chev + '</span></button>'
+  var tag = !closed && f.status === 'proposed' && f.approved !== null ? '<span class="chip" style="color:var(--ok);background:var(--ok-soft)">' + icon('check', 11) + esc(t.approvedChip) + '</span>'
+    : !closed && f.status === 'proposed' ? '<span class="chip" style="color:var(--claude);background:var(--claude-soft)">' + esc(t.hasFix) + '</span>'
+    : f.isCarried ? '<span class="chip" style="color:var(--sugg);background:var(--sugg-soft)">' + esc(t.carried) + '</span>' : ''
+  return '<div class="rowwrap" data-key="row-' + f.id + '">' + pickBox(f) + '<button class="row' + (closed ? ' closed' : '') + '" type="button" data-sel="' + f.id + '" aria-label="' + esc(t.open + ' ' + f.id) + '">' + lead + '<span class="id">' + f.id + '</span><span class="tt">' + esc(f.title) + '</span>' + tag + '<span class="lc">' + esc(f.where) + '</span><span style="color:var(--faint);display:flex">' + I.chev + '</span></button></div>'
 }
 
 function fixHTML(f, v) {
@@ -681,7 +896,8 @@ function fixHTML(f, v) {
   if (!x) return ''
   var head = '<div class="solh"><span class="av c">' + I.claude + '</span><div class="who2"><span>' + esc(t.proposes) + ' · ' + esc(t.variant(v.fi + 1, f.fixes.length)) + '</span><b>' + esc(x.title) + '</b></div>'
   if (f.fixes.length > 1) head += '<div class="vers">' + f.fixes.map(function (y, i) { return '<button class="ver" type="button" data-fix="' + i + '" aria-pressed="' + (i === v.fi) + '" title="' + esc(y.title) + '"><span class="k">' + (i + 1) + '</span></button>' }).join('') + '</div>'
-  if (f.status === 'proposed') head += '<span class="chip" style="background:var(--surface);color:var(--muted);border:1px solid var(--border)">' + esc(t.untouched) + '</span>'
+  if (f.status === 'proposed' && f.approved === v.fi) head += '<span class="chip" style="color:var(--ok);background:var(--ok-soft)">' + icon('check', 11) + esc(t.approvedChip) + '</span>'
+  else if (f.status === 'proposed') head += '<span class="chip" style="background:var(--surface);color:var(--muted);border:1px solid var(--border)">' + esc(t.untouched) + '</span>'
   head += '</div>'
   var body = '<div class="solb">'
   if (f.status === 'applying') body += '<div class="banner wait"><span class="ic">' + icon('wrench') + '</span><div><b>' + esc(t.applying) + '</b>' + esc(t.applyingText) + '</div></div>'
@@ -696,15 +912,35 @@ function fixHTML(f, v) {
       return '<button class="fbtn" type="button" data-file="' + i + '" aria-pressed="' + (file === i) + '">' + esc(c.path.split('/').pop()) + '<span class="a">+' + a + '</span><span class="d">−' + d + '</span></button>'
     }).join('') + '</div>'
   }
-  body += codeHTML(x.changes[file]) + '</div>'
+  body += codeHTML(x.changes[file], f.id) + '</div>'
   body += '<div class="sec"><span class="lbl">' + esc(t.gaps) + '</span>' + (x.gaps.length ? '<ul class="gaps">' + x.gaps.map(function (g) { return '<li>' + vals(g) + '</li>' }).join('') + '</ul>' : '<p class="hint" style="padding:0">' + esc(t.noGaps) + '</p>') + '</div>'
   return '<div class="sol">' + head + body + '</div></div>'
+}
+
+function threadHTML(f) {
+  var t = T()
+  var h = '<section class="sec" data-key="discussion"><span class="lbl">' + esc(t.discussion) + '</span>'
+  if (f.thread.length) {
+    h += '<ol class="thread chat">' + f.thread.map(function (m, i) {
+      var c = m.by === 'claude'
+      return '<li data-key="msg-' + i + '"><span class="av ' + (c ? 'c' : 'y') + '">' + (c ? I.claude : esc(t.you.charAt(0))) + '</span><div class="m"><span class="nm"><b class="' + (c ? 'c' : '') + '">' + (c ? 'Claude' : esc(t.you)) + '</b> · <span class="mono">' + hhmm(m.at) + '</span> · ' + esc(m.via === 'session' ? t.viaSession : t.viaSide) + '</span><div class="tx' + (c ? ' c' : '') + '">' + (c ? rich(m.text) : esc(m.text)) + '</div></div></li>'
+    }).join('') + '</ol>'
+  }
+  if (f.busy === 'ask') h += typing(t.thinking)
+  else if (f.isAsking) h += typing(t.askingDeep)
+  var draft = asks[f.id] || { text: '', isDeep: false }
+  var locked = f.busy === 'ask' || f.isAsking || isPending(f.id)
+  h += '<div class="ask" data-key="ask-' + f.id + '"><textarea class="field" rows="1" data-ask="' + f.id + '" placeholder="' + esc(t.askPh) + '">' + esc(draft.text) + '</textarea>' +
+    '<div class="askbar"><label class="deep"><input type="checkbox" data-deep="' + f.id + '"' + (draft.isDeep || f.isCarried ? ' checked' : '') + (f.isCarried ? ' disabled' : '') + '><span>' + esc(t.deep) + '</span></label>' +
+    '<span class="askhint">' + esc(draft.isDeep || f.isCarried ? t.deepHint : t.sideHint) + '</span><span class="sp"></span>' +
+    '<button class="btn" type="button" data-askbtn="' + f.id + '"' + (locked || !draft.text.trim() ? ' disabled' : '') + '>' + icon('chat') + esc(t.askSend) + '<span class="kk">⌘↵</span></button></div></div>'
+  return h + '</section>'
 }
 
 function cardHTML(f) {
   var t = T(), v = viewOf(f), ver = f.versions[v.vi], g = groupOf(f)
   var h = '<article class="card' + (g === 'closed' ? ' closed' : '') + '" data-key="card-' + f.id + '"><div class="cbody">'
-  h += '<div class="chead"><div class="r"><span class="idtag">' + f.id + '</span>' + sevChip(f.severity) + '<span class="sp"></span><button class="loc" type="button" data-copy="' + esc(f.where) + '" title="' + esc(t.copyPath) + '">' + esc(f.where) + I.copy + '</button></div><h3>' + esc(f.title) + '</h3></div>'
+  h += '<div class="chead"><div class="r">' + pickBox(f) + '<span class="idtag">' + f.id + '</span>' + sevChip(f.severity) + '<span class="sp"></span><button class="loc" type="button" data-copy="' + esc(f.where) + '" title="' + esc(t.copyPath) + '">' + esc(f.where) + I.copy + '</button></div><h3>' + esc(f.title) + '</h3></div>'
   if (f.isCarried) h += '<div class="banner info"><span class="ic">' + icon('link') + '</span><div><b>' + esc(t.carriedTitle) + '</b>' + esc(t.carriedText) + '</div></div>'
   if (f.status === 'deferred') h += '<div class="banner wait"><span class="ic">' + icon('clock') + '</span><div><b>' + esc(t.deferredTitle) + '</b>' + esc(t.deferredText) + '</div></div>'
   if (f.status === 'fixed') h += '<div class="banner ok"><span class="ic">' + icon('check') + '</span><div><b>' + esc(t.fixedTitle) + '</b>' + vals(f.check) + '</div></div>'
@@ -713,7 +949,7 @@ function cardHTML(f) {
   h += '<section class="sec"><div class="sech"><span class="lbl">' + esc(t.plain) + '</span>'
   if (f.versions.length > 1) h += '<div class="vers" role="group">' + f.versions.map(function (x, i) { return '<button class="ver" type="button" data-ver="' + i + '" aria-pressed="' + (i === v.vi) + '"><span class="k">' + (i + 1) + '</span>' + esc(originLabel(f, i)) + '</button>' }).join('') + '</div>'
   h += '</div>'
-  if (f.busy) h += typing(f.busy === 'simpler' ? t.typingSimpler : t.typingExample)
+  if (f.busy === 'simpler' || f.busy === 'example') h += typing(f.busy === 'simpler' ? t.typingSimpler : t.typingExample)
   else h += '<div style="display:flex;flex-direction:column;gap:6px"><p class="plain">' + vals(ver.plain) + '</p>' + (ver.note ? '<span class="vnote">' + esc(t.byNote) + ' <q>' + esc(ver.note) + '</q></span>' : '') + '</div>'
   h += '</section>'
 
@@ -724,17 +960,18 @@ function cardHTML(f) {
       return w.who ? '<div class="w">' + esc(w.who) + '</div><div>' + rest + '</div>' : '<div class="wide">' + rest + '</div>'
     }).join('') + '</div></section>'
   }
-  if (f.status === 'fixing' || f.status === 'proposed' || f.status === 'applying') h += '<section class="sec"><span class="lbl">' + esc(t.solution) + '</span>' + fixHTML(f, v) + '</section>'
+  if (f.status === 'fixing' || f.status === 'proposed' || f.status === 'applying') h += '<section class="sec" data-key="solution"><span class="lbl">' + esc(t.solution) + '</span>' + fixHTML(f, v) + '</section>'
+  h += threadHTML(f)
 
   if (f.log.length) {
-    h += '<section class="sec"><span class="lbl">' + esc(t.history) + '</span><ol class="thread">' + f.log.map(function (l, i) {
+    h += '<section class="sec" data-key="history"><span class="lbl">' + esc(t.history) + '</span><ol class="thread">' + f.log.map(function (l, i) {
       var c = l.by === 'claude'
       return '<li data-key="log-' + i + '"><span class="av ' + (c ? 'c' : 'y') + '">' + (c ? I.claude : esc(t.you.charAt(0))) + '</span><div class="m"><span class="nm"><b class="' + (c ? 'c' : '') + '">' + (c ? 'Claude' : esc(t.you)) + '</b> · <span class="mono">' + hhmm(l.at) + '</span></span><div class="tx' + (c ? ' c' : '') + '">' + esc(t.moment[l.what] || l.what) + (l.note ? ' · <q>«' + esc(bare(l.note)) + '»</q>' : '') + '</div></div></li>'
     }).join('') + '</ol></section>'
   }
   h += '</div>'
 
-  var waiting = isPending(f.id), busy = !!f.busy || f.status === 'fixing' || f.status === 'applying'
+  var waiting = isPending(f.id), busy = f.busy === 'simpler' || f.busy === 'example' || f.status === 'fixing' || f.status === 'applying'
   var dis = waiting || busy ? ' disabled' : ''
   h += '<div class="foot">'
   if (g !== 'closed') {
@@ -745,7 +982,9 @@ function cardHTML(f) {
   if (g === 'closed') {
     h += '<button class="btn" type="button" data-key="a-reopen" data-act="restore"' + (waiting ? ' disabled' : '') + '>' + icon('reopen') + esc(t.act.reopen) + '</button>'
   } else if (f.status === 'proposed' || f.status === 'applying' || (f.status === 'fixing' && f.fixes.length)) {
+    var isApproved = f.approved === v.fi
     h += '<button class="btn primary" type="button" data-key="a-apply" data-act="apply"' + dis + '>' + icon('check') + esc(t.act.apply) + '<span class="kk">⌘↵</span></button>' +
+      '<button class="btn' + (isApproved ? ' on' : '') + '" type="button" data-key="a-approve" data-act="' + (isApproved ? 'unapprove' : 'approve') + '"' + dis + '>' + icon('check') + esc(isApproved ? t.unapprove : t.approve) + '</button>' +
       '<button class="btn" type="button" data-key="a-another" data-act="another"' + dis + '>' + icon('example') + esc(t.act.another) + '</button>' +
       '<button class="btn" type="button" data-key="a-discuss" data-act="discuss"' + (waiting ? ' disabled' : '') + '>' + icon('chat') + esc(t.act.discuss) + '</button><span class="sp"></span>' +
       '<button class="btn quiet" type="button" data-key="a-cancel" data-act="cancel"' + (waiting ? ' disabled' : '') + '>' + esc(t.act.cancel) + '</button>'
@@ -765,15 +1004,32 @@ function cardHTML(f) {
   return h
 }
 
+function bulkHTML() {
+  var t = T(), picked = pickedIds(), approved = approvedIds(), busy = isPending('*')
+  if (!picked.length && !approved.length) return ''
+  var h = '<div class="bulk" data-key="bulk">'
+  if (picked.length) {
+    h += '<div class="brow"><span class="bcount">' + esc(t.picked(picked.length)) + ' <span class="mono">' + esc(picked.join(', ')) + '</span></span><span class="bhint">' + esc(t.bulkHint) + '</span><span class="sp"></span>' +
+      '<button class="btn quiet" type="button" data-unpick>' + esc(t.unpick) + '</button><button class="btn primary" type="button" data-fixmany' + (busy ? ' disabled' : '') + '>' + icon('wrench') + esc(t.prepareN) + '</button></div>'
+  }
+  if (approved.length) {
+    h += '<div class="brow"><span class="bcount">' + esc(t.approvedN(approved.length)) + ' <span class="mono">' + esc(approved.join(', ')) + '</span></span><span class="bhint">' + esc(t.approveHint) + '</span><span class="sp"></span>' +
+      '<button class="btn primary" type="button" data-applymany' + (busy ? ' disabled' : '') + '>' + icon('check') + esc(t.applyApproved) + '</button></div>'
+  }
+  return h + '</div>'
+}
+
 function renderMain() {
   var t = T(), all = inTab(S.tab), vis = visible(), sel = selected()
   var h = '<div class="mhead" data-key="mhead"><div class="t"><h2>' + esc(t.groups[S.tab]) + '</h2><span>' + esc(t.groupSub[S.tab]) + ' · <span class="mono">' + all.length + '</span></span></div>'
+  if (S.tab !== 'closed' && vis.length) h += '<button class="ghostbtn ghost" type="button" data-pickall>' + icon('check', 15) + esc(t.pickAll) + '</button>'
   h += '<button class="ghostbtn ghost" type="button" data-copylist>' + icon('copy', 15) + esc(t.copyList) + '</button></div>'
   var cnt = { all: all.length, high: 0, medium: 0, low: 0 }
   all.forEach(function (f) { cnt[f.severity]++ })
   h += '<div class="filters" role="tablist" data-key="filters">' + [['all', ''], ['high', SEVG.high], ['medium', SEVG.medium], ['low', SEVG.low]].map(function (x) {
     return '<button class="filter" role="tab" type="button" data-sev="' + x[0] + '" aria-selected="' + (S.sev === x[0]) + '">' + (x[1] ? '<span class="g g-' + x[0] + '">' + x[1] + '</span>' : '') + esc(x[0] === 'all' ? t.all : t.sev[x[0]]) + '<span class="c">' + cnt[x[0]] + '</span></button>'
   }).join('') + '</div>'
+  h += bulkHTML()
   if (!vis.length) {
     var k = S.q || S.sev !== 'all' ? 'filter' : S.tab
     h += '<div class="empty" data-key="empty-' + k + '"><div class="ic">' + icon('check', 30) + '</div><h2>' + esc(t.emptyTitle[k]) + '</h2><p>' + esc(t.emptyText[k]) + '</p></div>'
@@ -781,10 +1037,9 @@ function renderMain() {
     h += '<div class="stack" data-key="stack">' + vis.map(function (f) { return f.id === sel ? cardHTML(f) : rowHTML(f) }).join('') + '</div>'
   }
   paint($('main'), h)
-  var ta = document.querySelector('textarea[data-note]')
-  if (ta) autosize(ta)
+  Array.prototype.forEach.call(document.querySelectorAll('textarea[data-note],textarea[data-ask]'), autosize)
 }
-function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, 120) + 'px' }
+function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, 160) + 'px' }
 
 function renderAside() {
   var t = T(), def = inTab('deferred')
@@ -802,15 +1057,26 @@ function renderAside() {
   paint($('aside'), h)
 }
 
+/** The same note the mod puts beside the next message, as far as the page can tell it. */
+function contextPreview() {
+  var t = T(), lines = []
+  if (state.news && state.news.length) lines.push(t.newsHead + '\n' + state.news.map(function (n) { return '- ' + n.id + ' «' + n.title + '»: ' + (t.newsWhat[n.what] || n.what) + (n.note ? ': ' + n.note : '') }).join('\n'))
+  var dismissed = state.findings.filter(function (f) { return f.status === 'dismissed' }).map(function (f) { return f.id })
+  var deferred = state.findings.filter(function (f) { return f.status === 'deferred' }).map(function (f) { return f.id })
+  if (dismissed.length) lines.push(t.standingDismissed(dismissed.join(', ')))
+  if (deferred.length) lines.push(t.standingDeferred(deferred.join(', ')))
+  return lines.join('\n')
+}
+
 function renderDrawer() {
   $('drawer').classList.toggle('show', S.drawer)
   $('scrim').classList.toggle('show', S.drawer)
   if (!S.drawer) return
-  var t = T(), ids = inTab('deferred').map(function (f) { return f.id }).join(', ')
+  var t = T(), preview = contextPreview()
   var h = '<header><span class="logo" style="width:32px;height:32px">' + I.code + '</span><h2>' + esc(t.drawerTitle) + '</h2><button class="iconbtn ghost" type="button" data-close aria-label="' + esc(t.close) + '">' + I.x + '</button></header><div class="body">'
+  h += '<section class="sec"><span class="lbl">' + esc(t.seesLbl) + '</span><div class="tool"><pre class="pre">' + esc(preview || t.seesNone) + '</pre></div><p class="hint" style="padding:0">' + esc(t.seesHint) + '</p></section>'
   h += '<section class="sec"><span class="lbl">' + esc(t.ruleLbl) + '</span><div class="rule">' + t.rule.map(function (p) { return '<p>' + p + '</p>' }).join('') + '</div></section>'
   h += '<section class="sec"><span class="lbl">' + esc(t.toolsLbl) + '</span>' + t.tools.map(function (x) { return '<div class="tool"><div class="th"><code>mcp__findings__' + x[0] + '</code><span>' + esc(x[1]) + '</span></div></div>' }).join('') + '</section>'
-  h += '<section class="sec"><span class="lbl">' + esc(t.seesLbl) + '</span><div class="tool"><pre class="pre">' + esc(ids ? t.deferredLine(ids) : t.seesNone) + '</pre></div><p class="hint" style="padding:0">' + esc(t.seesHint) + '</p></section>'
   h += '</div>'
   paint($('drawer'), h)
 }
@@ -831,9 +1097,14 @@ function toast(msg, undo) {
 $('toastUndo').onclick = function () { if (undoFn) undoFn(); undoFn = null; $('toast').classList.remove('show') }
 
 /* ---------- presses ---------- */
-function send(data, findingId) {
+function press(type, extra) {
+  var data = { type: type, id: '', ids: [], note: '', isDeep: false, version: 0, fix: 0, lang: hub.lang }
+  for (var k in extra) data[k] = extra[k]
+  return data
+}
+function send(data, waitOn) {
   return hub.send(data).then(function (sent) {
-    if (findingId) { pending[sent.id] = findingId; renderMain() }
+    if (waitOn) { pending[sent.id] = waitOn; renderMain() }
     if (!sent.online) toast(T().waitingSession)
     return sent
   }, function () { toast(T().sendFail) })
@@ -842,15 +1113,26 @@ function act(kind) {
   var id = S.sel[S.tab], f = byId(id)
   if (!f || isPending(f.id)) return
   var v = viewOf(f), t = T()
-  var note = kind === 'cancel' || kind === 'restore' ? '' : (notes[f.id] || '').trim()
-  var data = { type: kind, id: f.id, note: note, version: v.vi, fix: v.fi, lang: hub.lang }
-  send(data, f.id).then(function (sent) {
+  var note = kind === 'cancel' || kind === 'restore' || kind === 'approve' || kind === 'unapprove' ? '' : (notes[f.id] || '').trim()
+  send(press(kind, { id: f.id, note: note, version: v.vi, fix: v.fi }), f.id).then(function (sent) {
     if (!sent) return
     if (note) { notes[f.id] = '' }
     if (kind === 'defer' || kind === 'dismiss') {
-      toast(kind === 'defer' ? t.deferredToast : t.dismissedToast, function () { send({ type: 'restore', id: f.id, note: '', version: 0, fix: 0, lang: hub.lang }, f.id) })
+      toast(kind === 'defer' ? t.deferredToast : t.dismissedToast, function () { send(press('restore', { id: f.id }), f.id) })
     }
     if (kind === 'discuss') toast(t.discussToast)
+    renderMain()
+  })
+}
+function ask(id) {
+  var f = byId(id), draft = asks[id]
+  if (!f || !draft || !draft.text.trim() || f.busy === 'ask' || f.isAsking || isPending(id)) return
+  var v = viewOf(f)
+  send(press('ask', { id: id, note: draft.text.trim(), isDeep: draft.isDeep || f.isCarried, version: v.vi, fix: v.fi }), id).then(function (sent) {
+    if (!sent) return
+    asks[id] = { text: '', isDeep: draft.isDeep }
+    var ta = document.querySelector('textarea[data-ask="' + id + '"]')
+    if (ta) { ta.value = ''; autosize(ta) }
     renderMain()
   })
 }
@@ -865,19 +1147,36 @@ function scrollToCard() {
     if (r.top < 90 || r.top > innerHeight * 0.6) window.scrollTo({ top: scrollY + r.top - 110, behavior: 'smooth' })
   })
 }
+function setMode(mode) {
+  S.codeMode = mode
+  try { localStorage.setItem('findings.codeMode', mode) } catch (e) {}
+  renderMain()
+}
 
 document.addEventListener('click', function (e) {
-  var el = e.target.closest('[data-tab],[data-sel],[data-act],[data-ver],[data-fix],[data-file],[data-copy],[data-sev],[data-copylist],[data-clear],[data-drawer],[data-close],#scrim')
-  if (!el) return
+  var el = e.target.closest('[data-pick],[data-tab],[data-sel],[data-act],[data-ver],[data-fix],[data-file],[data-copy],[data-sev],[data-copylist],[data-clear],[data-drawer],[data-close],[data-mode],[data-unfold],[data-askbtn],[data-pickall],[data-unpick],[data-fixmany],[data-applymany],#scrim')
+  if (!el || el.disabled) return
   var d = el.dataset, f = byId(S.sel[S.tab])
+  if (d.pick) { S.picked[d.pick] = !S.picked[d.pick]; renderMain(); return }
   if (d.tab) { S.tab = d.tab; S.sev = 'all'; renderAll(); return }
   if (d.sev) { S.sev = d.sev; renderMain(); return }
   if (d.sel) { S.sel[S.tab] = d.sel; renderMain(); scrollToCard(); return }
   if (d.act) { act(d.act); return }
+  if (d.askbtn) { ask(d.askbtn); return }
+  if (d.mode) { setMode(d.mode); return }
+  if (d.unfold) { S.unfolded[d.unfold] = true; renderMain(); return }
   if (d.ver && f) { viewOf(f).vi = Number(d.ver); renderMain(); return }
   if (d.fix && f) { var v = viewOf(f); v.fi = Number(d.fix); v.file = 0; renderMain(); return }
   if (d.file && f) { viewOf(f).file = Number(d.file); renderMain(); return }
   if (d.copy !== undefined) { copy(d.copy, T().copied + ': ' + d.copy); return }
+  if (el.hasAttribute('data-pickall')) { var all = visible().filter(canPick), on = !all.every(function (x) { return S.picked[x.id] }); all.forEach(function (x) { S.picked[x.id] = on }); renderMain(); return }
+  if (el.hasAttribute('data-unpick')) { S.picked = {}; renderMain(); return }
+  if (el.hasAttribute('data-fixmany')) {
+    var ids = pickedIds()
+    if (ids.length) send(press('fixMany', { ids: ids }), '*').then(function (sent) { if (sent) { S.picked = {}; renderMain() } })
+    return
+  }
+  if (el.hasAttribute('data-applymany')) { var ok = approvedIds(); if (ok.length) send(press('applyMany', { ids: ok }), '*'); return }
   if (el.hasAttribute('data-copylist')) {
     copy(inTab(S.tab).map(function (x) { return '[' + x.id + '] ' + T().sev[x.severity] + ' — ' + x.title + '\n  ' + x.where + '\n  ' + bare(x.versions[viewOf(x).vi].plain) }).join('\n\n'), T().listCopied)
     return
@@ -885,8 +1184,8 @@ document.addEventListener('click', function (e) {
   if (el.hasAttribute('data-clear')) {
     var n = inTab('closed').length
     if (!n) return
-    send({ type: 'clear', id: '', note: '', version: 0, fix: 0, lang: hub.lang }).then(function (sent) {
-      if (sent) toast(T().cleared(n), function () { send({ type: 'unclear', id: '', note: '', version: 0, fix: 0, lang: hub.lang }) })
+    send(press('clear')).then(function (sent) {
+      if (sent) toast(T().cleared(n), function () { send(press('unclear')) })
     })
     return
   }
@@ -894,6 +1193,10 @@ document.addEventListener('click', function (e) {
   if (el.hasAttribute('data-close') || el.id === 'scrim') { S.drawer = false; renderDrawer() }
 })
 document.addEventListener('toggle', function (e) { if (e.target.matches && e.target.matches('details.keys')) S.keysOpen = e.target.open }, true)
+document.addEventListener('change', function (e) {
+  var el = e.target
+  if (el.dataset && el.dataset.deep) { var a = asks[el.dataset.deep] || (asks[el.dataset.deep] = { text: '', isDeep: false }); a.isDeep = el.checked; renderMain() }
+})
 document.addEventListener('input', function (e) {
   var el = e.target
   if (el.id === 'q') { S.q = el.value.trim().toLowerCase(); renderMain(); return }
@@ -902,11 +1205,21 @@ document.addEventListener('input', function (e) {
     autosize(el)
     var pv = el.parentNode.querySelector('.pv')
     if (pv) pv.textContent = el.value.trim() ? T().noteGoes + ' «' + el.value.trim() + '»' : ''
+    return
+  }
+  if (el.dataset && el.dataset.ask) {
+    var a = asks[el.dataset.ask] || (asks[el.dataset.ask] = { text: '', isDeep: false })
+    var wasEmpty = !a.text.trim()
+    a.text = el.value
+    autosize(el)
+    if (wasEmpty !== !a.text.trim()) renderMain()
   }
 })
 document.addEventListener('keydown', function (e) {
   var tag = e.target.tagName, isTyping = tag === 'TEXTAREA' || tag === 'INPUT'
   if (e.key === 'Escape') { if (S.drawer) { S.drawer = false; renderDrawer(); return } if (isTyping) e.target.blur(); return }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && e.target.dataset && e.target.dataset.ask) { e.preventDefault(); ask(e.target.dataset.ask); return }
+  if (e.key === ' ' && e.target.dataset && e.target.dataset.pick) { e.preventDefault(); e.target.click(); return }
   var f = byId(S.sel[S.tab])
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && f && groupOf(f) !== 'closed') {
     e.preventDefault()
@@ -927,21 +1240,22 @@ document.addEventListener('keydown', function (e) {
 })
 
 /* ---------- the hub ---------- */
-function prepare(next) {
+function prepare() {
   if (shiki.state !== 'ready') return Promise.resolve()
-  var missing = allChanges().filter(function (c) { return painted[codeKey(c)] === undefined })
+  var missing = allChanges().filter(function (c) { return painted[codeKey(c)] === undefined || (c.full && painted['F' + codeKey(c)] === undefined) })
   if (!missing.length) return Promise.resolve()
   return Promise.race([Promise.all(missing.map(highlight)), new Promise(function (ok) { setTimeout(ok, 400) })])
 }
 var arrivals = Promise.resolve()
 hub.onState(function (next) {
-  var incoming = next && Array.isArray(next.findings) ? next : { findings: [], branch: '', events: [], updatedAt: 0 }
+  var incoming = next && Array.isArray(next.findings) ? next : { findings: [], branch: '', events: [], news: [], updatedAt: 0 }
+  if (!Array.isArray(incoming.news)) incoming.news = []
   arrivals = arrivals.then(function () {
     var before = state
     state = incoming
     var fresh = state.findings.filter(function (f) { return !before.findings.some(function (b) { return b.id === f.id }) })
     if (fresh.length && before.findings.length) { S.tab = 'open'; S.sel.open = fresh[0].id }
-    return prepare().then(function () { renderAll(); if (highlightAll) highlightAll().then(renderMain) })
+    return prepare().then(function () { renderAll(); highlightAll().then(renderMain) })
   })
 })
 hub.onDelivered(function (ids) {

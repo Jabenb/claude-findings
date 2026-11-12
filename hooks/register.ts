@@ -1,13 +1,15 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Entry, Finding, Lang, Moment, PageAction, ProjectFile, State } from '../types'
+import type { Entry, FileChange, Finding, Fix, Lang, Moment, PageAction, ProjectFile, State } from '../types'
 import {
   applyAsk,
   applyChange,
+  applyManyAsk,
+  askPrompt,
+  askViaSession,
   carriedFor,
+  contextNote,
   DAY,
-  deferredIds,
-  deferredNote,
   discussText,
   DONE_DESCRIPTION,
   DONE_SCHEMA,
@@ -20,6 +22,7 @@ import {
   FIX_TOOL,
   fixAsk,
   fixAt,
+  fixManyAsk,
   GUIDE,
   isClosed,
   isLocal,
@@ -35,6 +38,10 @@ import {
   parseState,
   projectSlug,
   PROPOSE_FIX,
+  REPLY,
+  REPLY_DESCRIPTION,
+  REPLY_SCHEMA,
+  REPLY_TOOL,
   REPORT,
   REPORT_DESCRIPTION,
   REPORT_SCHEMA,
@@ -43,6 +50,7 @@ import {
   sweepProject,
   syncProject,
   waitingCount,
+  withFile,
   words,
 } from './model'
 import type { Change } from './model'
@@ -53,11 +61,13 @@ const ICON = '🔎'
 const COMMAND = 'findings'
 const PULL_WAIT_MS = 5000
 const PULL_STUCK_MS = PULL_WAIT_MS + 10_000
+const ANSWER_IN_NEWS = 300
 
 /** The tools as the engine names them; patterns, as a tool this mod registers is not in the types until the mod has loaded once. */
 const REPORT_CALL = new RegExp(`^${REPORT}$`)
 const FIX_CALL = new RegExp(`^${PROPOSE_FIX}$`)
 const DONE_CALL = new RegExp(`^${MARK_FIXED}$`)
+const REPLY_CALL = new RegExp(`^${REPLY}$`)
 
 /** One load of this module: the hub hands the page's presses to the newest load only. */
 const LISTENER = `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -70,6 +80,8 @@ let session: { id: string; path: string } | null = null
 let listening = { since: 0, isFirst: true, isStale: false }
 /** What "Clear closed" took away, so its undo can put it back. */
 let dropped: Finding[] = []
+/** While the mod sends a message of its own: that message already carries the page's news, the prompt hook adds nothing. */
+let isDelivering = false
 let queue: Promise<unknown> = Promise.resolve()
 
 /** Changes run one at a time: each reads the state the one before it left. */
@@ -244,16 +256,28 @@ const sweep = async ($: EngineInterface): Promise<void> => {
   }
 }
 
-/** Sends the page's ask as the person's own message; a dropped one (an interrupted turn) is said, not lost silently. */
-const deliver = async ($: EngineInterface, text: string): Promise<boolean> => {
+/** What goes beside the next message to Claude; built at the moment of sending, so the latest presses are in. */
+const context = (): string => contextNote(current, lang)
+
+/**
+ * Sends the page's ask as the person's own message, built with the page's news in it; the news is then told and cleared.
+ * A dropped message (an interrupted turn) is said, not lost silently, and the news waits for the next one.
+ */
+const deliver = async ($: EngineInterface, build: (note: string) => string): Promise<boolean> => {
+  isDelivering = true
+
   try {
-    const sent = await $.prompt.submit({ text, asUser: true })
+    const sent = await $.prompt.submit({ text: build(context()), asUser: true })
 
     if (sent.drop === undefined) {
+      await dispatch($, { op: 'told' })
+
       return true
     }
   } catch {
     // said below
+  } finally {
+    isDelivering = false
   }
 
   $.ui.toast(words(lang).notSent, { timeoutMs: 5000 })
@@ -262,6 +286,10 @@ const deliver = async ($: EngineInterface, text: string): Promise<boolean> => {
 }
 
 const findingOf = (id: string): Finding | undefined => current.findings.find(finding => finding.id === id)
+
+/** Something the person did on the page that sends no message: Claude hears of it with the next one. */
+const tell = ($: EngineInterface, finding: Finding, what: Moment, note: string, at: number): Promise<State> =>
+  dispatch($, { op: 'news', news: { at, what, id: finding.id, title: finding.title, note } })
 
 /** A quick side answer over this conversation; through chat when the session has not read the code, or the side answer failed. */
 const explain = async ($: EngineInterface, finding: Finding, action: PageAction, entry: Entry): Promise<void> => {
@@ -272,7 +300,7 @@ const explain = async ($: EngineInterface, finding: Finding, action: PageAction,
   }
 
   if (finding.isCarried) {
-    if (await deliver($, explainAsk(finding, mode, action.note, lang))) {
+    if (await deliver($, note => explainAsk(finding, mode, action.note, lang, note))) {
       await dispatch($, { op: 'note', id: finding.id, entry })
     }
 
@@ -297,17 +325,92 @@ const explain = async ($: EngineInterface, finding: Finding, action: PageAction,
 
   await dispatch($, { op: 'busy', id: finding.id, busy: null })
 
-  if (await deliver($, explainAsk(finding, mode, action.note, lang))) {
+  if (await deliver($, note => explainAsk(finding, mode, action.note, lang, note))) {
+    $.ui.toast(words(lang).viaChat, { timeoutMs: 5000 })
+  }
+}
+
+/** Puts a question through the session: Claude may read the code and answers with the reply tool. */
+const askDeep = async ($: EngineInterface, finding: Finding, question: string, fix: Fix | null): Promise<boolean> => {
+  await dispatch($, { op: 'asking', id: finding.id, isAsking: true })
+
+  if (await deliver($, note => askViaSession(finding, question, fix, lang, note))) {
+    return true
+  }
+
+  await dispatch($, { op: 'asking', id: finding.id, isAsking: false })
+
+  return false
+}
+
+/** A question on the card: beside the chat by default, through the session when asked so, for a carried finding, or when the side answer fails. */
+const ask = async ($: EngineInterface, finding: Finding, action: PageAction, at: number): Promise<void> => {
+  const question = action.note
+
+  if (question === '' || finding.busy !== null || finding.isAsking) {
+    return
+  }
+
+  const fix = finding.status === 'proposed' || finding.status === 'applying' ? fixAt(finding, action.fix) : null
+  const isDeep = action.isDeep || finding.isCarried
+  await dispatch($, { op: 'ask', id: finding.id, message: { at, by: 'you', text: question, via: isDeep ? 'session' : 'side' } })
+
+  if (isDeep) {
+    await askDeep($, finding, question, fix)
+
+    return
+  }
+
+  await dispatch($, { op: 'busy', id: finding.id, busy: 'ask' })
+  let answer = ''
+
+  try {
+    const forked = await $.model.fork({ prompt: askPrompt(finding, question, action.version, fix) })
+    answer = forked.isAnswered ? forked.text.trim() : ''
+  } catch {
+    answer = ''
+  }
+
+  if (answer !== '') {
+    const now = await $.clock.now()
+    await dispatch($, { op: 'answer', id: finding.id, message: { at: now, by: 'claude', text: answer, via: 'side' } })
+    await tell($, finding, 'ask', `${question} → ${answer.length > ANSWER_IN_NEWS ? `${answer.slice(0, ANSWER_IN_NEWS - 1)}…` : answer}`, now)
+
+    return
+  }
+
+  await dispatch($, { op: 'busy', id: finding.id, busy: null })
+
+  if (await askDeep($, finding, question, fix)) {
     $.ui.toast(words(lang).viaChat, { timeoutMs: 5000 })
   }
 }
 
 const askFix = async ($: EngineInterface, finding: Finding, action: PageAction, entry: Entry): Promise<void> => {
   const before = finding.status
-  const state = await dispatch($, { op: 'status', id: finding.id, status: 'fixing', entry })
+  await dispatch($, { op: 'status', id: finding.id, status: 'fixing', entry })
 
-  if (!(await deliver($, fixAsk(finding, action.note, deferredIds(state.findings), lang)))) {
+  if (!(await deliver($, note => fixAsk(finding, action.note, lang, note)))) {
     await dispatch($, { op: 'status', id: finding.id, status: before })
+  }
+}
+
+/** One message asking a solution for each of the findings pressed together. */
+const askFixMany = async ($: EngineInterface, action: PageAction, at: number): Promise<void> => {
+  const chosen = action.ids.flatMap(id => findingOf(id) ?? []).filter(finding => finding.status === 'open' || finding.status === 'deferred' || finding.status === 'proposed')
+
+  if (chosen.length === 0) {
+    return
+  }
+
+  for (const finding of chosen) {
+    await dispatch($, { op: 'status', id: finding.id, status: 'fixing', entry: { at, by: 'you', what: finding.fixes.length > 0 ? 'another' : 'fix', note: action.note } })
+  }
+
+  if (!(await deliver($, note => fixManyAsk(chosen, action.note, lang, note)))) {
+    for (const finding of chosen) {
+      await dispatch($, { op: 'status', id: finding.id, status: finding.status })
+    }
   }
 }
 
@@ -318,10 +421,34 @@ const applyFix = async ($: EngineInterface, finding: Finding, action: PageAction
     return
   }
 
-  const state = await dispatch($, { op: 'status', id: finding.id, status: 'applying', entry })
+  await dispatch($, { op: 'status', id: finding.id, status: 'applying', entry })
 
-  if (!(await deliver($, applyAsk(finding, fix, action.note, deferredIds(state.findings), lang)))) {
+  if (!(await deliver($, note => applyAsk(finding, fix, action.note, lang, note)))) {
     await dispatch($, { op: 'status', id: finding.id, status: 'proposed' })
+  }
+}
+
+/** One message applying every approved solution among the findings pressed together (all approved ones when none are named). */
+const applyMany = async ($: EngineInterface, action: PageAction, at: number): Promise<void> => {
+  const named = action.ids.length === 0 ? current.findings : action.ids.flatMap(id => findingOf(id) ?? [])
+  const approved = named.flatMap(finding => {
+    const fix = finding.status === 'proposed' && finding.approved !== null ? (finding.fixes[finding.approved] ?? null) : null
+
+    return fix === null ? [] : [{ finding, fix }]
+  })
+
+  if (approved.length === 0) {
+    return
+  }
+
+  for (const { finding, fix } of approved) {
+    await dispatch($, { op: 'status', id: finding.id, status: 'applying', entry: { at, by: 'you', what: 'apply', note: fix.title } })
+  }
+
+  if (!(await deliver($, note => applyManyAsk(approved, action.note, lang, note)))) {
+    for (const { finding } of approved) {
+      await dispatch($, { op: 'status', id: finding.id, status: 'proposed' })
+    }
   }
 }
 
@@ -341,7 +468,15 @@ const discuss = async ($: EngineInterface, finding: Finding, action: PageAction,
   $.ui.toast(words(lang).noFill, { timeoutMs: 4000 })
 }
 
-const SENT: readonly PageAction['type'][] = ['simpler', 'example', 'fix', 'another', 'apply', 'discuss', 'defer', 'dismiss', 'restore']
+/** Each changed file as it is on disk now, for the whole-file view; a file that is not there is a new one. */
+const withFiles = async ($: EngineInterface, changes: FileChange[]): Promise<FileChange[]> => {
+  const root = await $.session.root()
+
+  return Promise.all(changes.map(async change => withFile(change, await readText($, change.path.startsWith('/') ? change.path : `${root}/${change.path}`))))
+}
+
+/** Presses that reach Claude as a message, or change what Claude is told: listed on the page under "Sent to Claude". */
+const SENT: readonly PageAction['type'][] = ['simpler', 'example', 'fix', 'another', 'apply', 'discuss', 'defer', 'dismiss', 'restore', 'ask', 'cancel']
 
 /** One press on the page. */
 const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
@@ -356,18 +491,32 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
     await $.store.set('lang', lang)
   }
 
-  if (action.type === 'clear') {
-    dropped = current.findings.filter(finding => isClosed(finding.status))
-    await dispatch($, { op: 'dropClosed' })
+  const at = await $.clock.now()
 
-    return
-  }
+  switch (action.type) {
+    case 'clear': {
+      dropped = current.findings.filter(finding => isClosed(finding.status))
+      await dispatch($, { op: 'dropClosed' })
 
-  if (action.type === 'unclear') {
-    await dispatch($, { op: 'putBack', findings: dropped })
-    dropped = []
+      for (const finding of dropped) {
+        await tell($, finding, 'clear', '', at)
+      }
 
-    return
+      return
+    }
+    case 'unclear':
+      await dispatch($, { op: 'putBack', findings: dropped })
+      dropped = []
+
+      return
+    case 'fixMany':
+      await dispatch($, { op: 'sent', event: { at, what: 'fix', id: action.ids.join(', '), note: action.note } })
+
+      return askFixMany($, action, at)
+    case 'applyMany':
+      await dispatch($, { op: 'sent', event: { at, what: 'apply', id: action.ids.join(', '), note: action.note } })
+
+      return applyMany($, action, at)
   }
 
   const finding = findingOf(action.id)
@@ -376,7 +525,6 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
     return
   }
 
-  const at = await $.clock.now()
   const what = action.type as Moment
   const entry: Entry = { at, by: 'you', what, note: action.note }
 
@@ -388,6 +536,8 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
     case 'simpler':
     case 'example':
       return explain($, finding, action, entry)
+    case 'ask':
+      return ask($, finding, action, at)
     case 'fix':
     case 'another':
       return askFix($, finding, action, entry)
@@ -395,20 +545,26 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
       return applyFix($, finding, action, entry)
     case 'discuss':
       return discuss($, finding, action, entry)
-    case 'cancel':
+    case 'approve':
+      await dispatch($, { op: 'approve', id: finding.id, fix: action.fix, at })
+
+      return
+    case 'unapprove':
+      await dispatch($, { op: 'approve', id: finding.id, fix: null, at })
+
+      return
+    case 'cancel': {
+      const title = fixAt(finding, action.fix)?.title ?? ''
       await dispatch($, { op: 'cancel', id: finding.id, at })
+      await tell($, finding, 'cancel', title, at)
 
       return
+    }
     case 'defer':
-      await dispatch($, { op: 'status', id: finding.id, status: 'deferred', entry })
-
-      return
     case 'dismiss':
-      await dispatch($, { op: 'status', id: finding.id, status: 'dismissed', entry })
-
-      return
     case 'restore':
-      await dispatch($, { op: 'status', id: finding.id, status: 'open', entry })
+      await dispatch($, { op: 'status', id: finding.id, status: action.type === 'defer' ? 'deferred' : action.type === 'dismiss' ? 'dismissed' : 'open', entry })
+      await tell($, finding, what, action.note, at)
   }
 }
 
@@ -442,6 +598,7 @@ export const register: Register = on => {
   current = EMPTY
   session = null
   dropped = []
+  isDelivering = false
   listening = { since: 0, isFirst: true, isStale: false }
 
   on('session.start', async ($, e, next) => {
@@ -450,6 +607,7 @@ export const register: Register = on => {
     await $.tool.register({ name: REPORT_TOOL, description: REPORT_DESCRIPTION, isDeferred: false, inputSchema: REPORT_SCHEMA })
     await $.tool.register({ name: FIX_TOOL, description: FIX_DESCRIPTION, isDeferred: false, inputSchema: FIX_SCHEMA })
     await $.tool.register({ name: DONE_TOOL, description: DONE_DESCRIPTION, isDeferred: false, inputSchema: DONE_SCHEMA })
+    await $.tool.register({ name: REPLY_TOOL, description: REPLY_DESCRIPTION, isDeferred: false, inputSchema: REPLY_SCHEMA })
 
     lang = langOf(await $.store.get('lang'))
     await copyOldData($)
@@ -468,11 +626,21 @@ export const register: Register = on => {
     return { sections: [...composed.sections, { id: 'findings:guide', text: GUIDE, scope: 'session' }] }
   })
 
-  /** What the person set aside rides on their own prompts, so a later "fix everything" skips it. */
+  /** The person's own message carries what they did on the page since the last one, and which findings stand closed or set aside. */
   on('prompt.submit', async ($, e, next) => {
-    const ids = e.command === undefined && e.origin?.kind !== 'plugin' ? deferredIds(current.findings) : []
+    const note = e.command === undefined && e.origin?.kind !== 'plugin' && !isDelivering ? context() : ''
 
-    return next(ids.length === 0 ? e : { ...e, context: [...(e.context ?? []), deferredNote(ids, lang)] })
+    if (note === '') {
+      return next(e)
+    }
+
+    const result = await next({ ...e, context: [...(e.context ?? []), note] })
+
+    if (result.drop === undefined && current.news.length > 0) {
+      await dispatch($, { op: 'told' })
+    }
+
+    return result
   })
 
   on('command.run', { command: COMMAND }, async $ => ({ text: (await show($)) ? words(lang).page(url) : words(lang).down }))
@@ -512,9 +680,22 @@ export const register: Register = on => {
       return { deny: `${PROPOSE_FIX} refused, nothing was shown. Fix these and call it again:\n- ${parsed.errors.join('\n- ')}` }
     }
 
-    await dispatch($, { op: 'fix', id: parsed.id, fix: parsed.fix, at: await $.clock.now() })
+    const fix = { ...parsed.fix, changes: await withFiles($, parsed.fix.changes) }
+    await dispatch($, { op: 'fix', id: parsed.id, fix, at: await $.clock.now() })
+    const unplaced = fix.changes.filter(change => change.full === null).map(change => change.path)
+    const waiting = current.findings.filter(finding => finding.status === 'fixing').map(finding => finding.id)
 
-    return { result: `The solution for ${parsed.id} is shown on the Findings page (${url}). Change no code: end your turn with one short line and wait, the user applies it from the page.` }
+    return {
+      result: [
+        `The solution for ${parsed.id} is shown on the Findings page (${url}).`,
+        unplaced.length === 0
+          ? ''
+          : `The diff of ${unplaced.join(', ')} could not be laid over the file on disk (context or removed lines differ from the file), so the page shows only the diff there. Call ${PROPOSE_FIX} again for ${parsed.id} with lines copied exactly from the file if you can.`,
+        waiting.length > 0 ? `Still waiting for solutions: ${waiting.join(', ')}.` : 'Change no code: end your turn with one short line and wait, the user applies it from the page.',
+      ]
+        .filter(part => part !== '')
+        .join(' '),
+    }
   })
 
   on('tool.call', { tool: DONE_CALL }, async ($, e) => {
@@ -534,5 +715,23 @@ export const register: Register = on => {
     await dispatch($, { op: 'status', id, status: 'fixed', check, entry: { at, by: 'claude', what: 'fixed', note: check } })
 
     return { result: `${id} is marked as fixed on the Findings page.` }
+  })
+
+  on('tool.call', { tool: REPLY_CALL }, async ($, e) => {
+    const input = e as unknown as { id?: unknown; text?: unknown }
+    const id = String(input.id ?? '').trim()
+    const answer = String(input.text ?? '').trim()
+
+    if (findingOf(id) === undefined) {
+      return { deny: `No finding with id "${id}" on the Findings page.` }
+    }
+
+    if (answer === '') {
+      return { deny: 'text is empty: give the answer.' }
+    }
+
+    await dispatch($, { op: 'answer', id, message: { at: await $.clock.now(), by: 'claude', text: answer, via: 'session' } })
+
+    return { result: `The answer is shown under ${id} on the Findings page. In chat, one short line.` }
   })
 }

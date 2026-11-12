@@ -24,9 +24,26 @@ The page is built on [Claude Hub (webhub)](https://github.com/jabenb/claude-webh
 | **Another option** | One more solution, different from the ones already shown; all of them stay on the card. |
 | **Discuss in chat** | Puts a quote of the finding (and of the solution) into the chat prompt box, for your own question. |
 | **Set aside** | The finding moves to "Set aside", and every message of yours tells Claude not to touch it until you bring it back. |
+| **Approve** | Marks the solution shown as approved, to apply it together with others. |
 | **Not a problem** | Closes the finding without a fix. |
 
 Every action takes an optional note: type it in the field above the buttons and it goes along ("without migrations", "what is type here?").
+
+### Discussion
+
+Under each finding there is a discussion: ask about the finding or its solution right there. By default the answer comes on the side, from what Claude already knows of the session, and nothing reaches the chat. Tick **With access to the code** and the question goes through the session instead: Claude reads the code it needs and answers in the card through the `reply` tool. A finding from another session is always asked that way.
+
+### Several findings at once
+
+Tick findings in the list (or **Select all**) and press **Prepare solutions**: one message asks Claude for a solution to each, and each lands in its own card. Approve the ones you like (**Approve** in the card), then **Apply approved** sends one message that applies them one by one; each finding closes as soon as Claude has checked its fix.
+
+### Code: one column, two columns, whole file
+
+The code of a solution has three views, switched in the code block's header and remembered by the browser: the diff in one column, the diff in two columns (before on the left, after on the right), and the whole file before and after, side by side. For the whole-file view the mod reads each changed file from disk when the solution is proposed and lays the diff over it; long unchanged stretches are folded and open with a click. If the diff does not fit the file (Claude copied a line wrong, or the file has changed), the card says so and shows the diff alone, and Claude is asked to propose it again with exact lines.
+
+### What Claude is told
+
+What you do on the page without sending a message (**Not a problem**, **Set aside**, reopening, cancelling a solution, clearing closed findings, a side question and its answer) is gathered and goes to Claude with your next message, whether you write in the chat or press a button that sends one. Changes go once; the lists of findings closed as "not a problem" and set aside go with every message, so Claude does not raise them again. **Tools and rule for Claude** on the page shows exactly what will go.
 
 The list has three groups: **Waiting for you**, **Set aside** and **Closed**; closed findings can be cleared at once (with undo). There are a search, a severity filter, a history per finding, and a side column with what Claude keeps in mind and what went to Claude from the page.
 
@@ -35,19 +52,21 @@ Keys: `J`/`K` next and previous, `⌘↵`/`Ctrl+↵` fix or apply, `S` simpler, 
 ## Requirements
 
 - [Claude Hub (webhub)](https://github.com/jabenb/claude-webhub) installed in the same scope, and Docker for its server.
+- For the whole-file view: the session runs where the project's files are (the mod reads them from disk).
 - A Claude Code build with mods (plugins with a hooks module).
 - A browser with internet access for the code highlighting (see below). Without it the page works, the code is shown without colours.
 
 ## Install
 
-At the prompt of a Claude Code session:
+The mod needs [Claude Hub (webhub)](https://github.com/jabenb/claude-webhub): install both in the same scope. The scope decides where they run:
 
-```
-/plugin install webhub --marketplace jabenb/claude-webhub
-/plugin install findings --marketplace jabenb/claude-findings
-```
+| Scope | Runs in | Written to |
+|---|---|---|
+| `user` (global, the default) | every project | `~/.claude/settings.json` |
+| `project` | this repository, for everyone who clones it | `<project>/.claude/settings.json` |
+| `local` | this repository, only for you | `<project>/.claude/settings.local.json` |
 
-From a shell:
+### Globally
 
 ```bash
 claude plugin install webhub --marketplace jabenb/claude-webhub
@@ -57,13 +76,61 @@ claude plugin install webhub --marketplace jabenb/claude-webhub
 claude plugin install findings --marketplace jabenb/claude-findings
 ```
 
-Add `--scope project` or `--scope local` to both for one repository only. If the mod is already loaded from a folder (`--plugin-dir`, `CLAUDE_CODE_PLUGIN_DIRS` or a session's mods folder), remove that first, or it loads twice.
+At the prompt of a Claude Code session the same works as `/plugin install findings --marketplace jabenb/claude-findings`.
+
+### For one project
+
+Run from the project's folder, with `--scope project` (or `--scope local` to keep it out of the files others see):
+
+```bash
+cd ~/path/to/project
+```
+
+```bash
+claude plugin install webhub --marketplace jabenb/claude-webhub --scope project
+```
+
+```bash
+claude plugin install findings --marketplace jabenb/claude-findings --scope project
+```
+
+### From a local copy
+
+To run a clone, or your own changes, without GitHub, add the folder as a marketplace and install from it (any scope above):
+
+```bash
+git clone git@github.com:jabenb/claude-findings.git ~/claude-findings
+```
+
+```bash
+claude plugin marketplace add ~/claude-findings
+```
+
+```bash
+claude plugin install findings@claude-findings --scope project
+```
+
+While working on the mod itself, load it straight from the folder for one session instead, next to the hub's folder; changes reload when a turn ends:
+
+```bash
+claude --plugin-dir ~/claude-webhub --plugin-dir ~/claude-findings
+```
+
+Or for every session: add the folder to `CLAUDE_CODE_PLUGIN_DIRS` (paths joined with `:`) in the `env` of `~/.claude/settings.json`. Do not keep a folder-loaded copy and an installed one at once, or the mod loads twice.
+
+### Updating
+
+```bash
+claude plugin marketplace update claude-findings
+```
+
+Then start a new session. The installed version is in `/plugin` under **Installed**.
 
 ## Use
 
 1. Ask Claude for a review, an audit or an investigation. With two or more findings Claude calls the `report` tool instead of writing a list, and says in one line that the findings are on the page, with its address.
 2. `/findings` prints the page's address at any time. The hub lists the page under the session's name too, with the number of findings waiting for you.
-3. Work through the cards. A press goes to Claude as a message from you; "Simpler" and "Another example" are answered on the side and never reach the chat, unless the quick answer fails.
+3. Work through the cards. A press goes to Claude as a message from you; "Simpler", "Another example" and questions in the discussion are answered on the side and never reach the chat, unless you ask with access to the code or the quick answer fails.
 
 The status line shows `Findings: N` while N findings wait for you.
 
@@ -92,11 +159,12 @@ The mod used to be called Razbor (`razbor`). On its first start it copies the da
 
 ## For Claude
 
-The mod adds a rule to the system prompt and three tools:
+The mod adds a rule to the system prompt and four tools:
 
 - `mcp__findings__report`: show findings, or a new explanation of one (`id`). Concrete values in the example are wrapped in `{{double braces}}` and set apart on the card.
 - `mcp__findings__propose_fix`: show a solution in the card, before any code changes.
 - `mcp__findings__mark_fixed`: mark a finding fixed after the edit, with `check`: how it was checked.
+- `mcp__findings__reply`: answer a question asked from the page with access to the code; the answer shows in the finding's discussion.
 
 ## Development
 

@@ -14,7 +14,13 @@ export type Witness = { who: string; how: string; when: string }
 /** One way the finding was explained. A simpler one may bring no steps of its own: the page then shows the steps of the one before. */
 export type Explanation = { plain: string; steps: Step[]; origin: 'claude' | 'simpler' | 'example'; note: string }
 
-export type FileChange = { path: string; diff: string }
+/**
+ * The file a change touches, as it was on disk when the solution was proposed, and where each hunk of the diff sits in it
+ * (0-based line of the hunk's first old line). Null when the file could not be read or the diff does not fit it.
+ */
+export type FullFile = { before: string; starts: number[] }
+
+export type FileChange = { path: string; diff: string; full: FullFile | null }
 
 export type Fix = { title: string; summary: string; steps: Step[]; changes: FileChange[]; gaps: string[] }
 
@@ -29,6 +35,8 @@ export type Moment =
   | 'fix'
   | 'another'
   | 'proposed'
+  | 'approve'
+  | 'unapprove'
   | 'apply'
   | 'fixed'
   | 'defer'
@@ -36,8 +44,14 @@ export type Moment =
   | 'restore'
   | 'cancel'
   | 'discuss'
+  | 'ask'
+  | 'answered'
+  | 'clear'
 
 export type Entry = { at: number; by: 'you' | 'claude'; what: Moment; note: string }
+
+/** One message of the discussion under a finding. `side`: answered beside the chat; `session`: asked through the session, where Claude can read the code. */
+export type Message = { at: number; by: 'you' | 'claude'; text: string; via: 'side' | 'session' }
 
 export type Finding = {
   id: string
@@ -49,19 +63,27 @@ export type Finding = {
   fixes: Fix[]
   status: Status
   /** A side answer is being written: the page shows Claude typing. */
-  busy: 'simpler' | 'example' | null
+  busy: 'simpler' | 'example' | 'ask' | null
+  /** A question asked through the session waits for its answer. */
+  isAsking: boolean
+  /** The solution the person approved for a batch apply (its index), or null. */
+  approved: number | null
   /** Reported by another session of the same branch: this session's model has not read its code. */
   isCarried: boolean
   /** How the applied solution was checked, as Claude said it when marking the finding fixed. */
   check: string
   log: Entry[]
+  thread: Message[]
 }
 
 /** One press on the page that reached Claude. */
 export type Sent = { at: number; what: Moment; id: string; note: string }
 
+/** What the person did on the page that Claude has not been told yet: it goes with the next message to Claude. */
+export type News = { at: number; what: Moment; id: string; title: string; note: string }
+
 /** What the page draws; the same value is this session's file. */
-export type State = { findings: Finding[]; branch: string; events: Sent[]; updatedAt: number }
+export type State = { findings: Finding[]; branch: string; events: Sent[]; news: News[]; updatedAt: number }
 
 /** A finding still waiting on the person, as the project's file keeps it for the branch's other sessions. */
 export type Standing = { branch: string; sessionId: string; updatedAt: number; finding: Finding }
@@ -70,9 +92,30 @@ export type ProjectFile = { lastNo: number; standing: Standing[] }
 
 /** What the page passes to `hub.send`. */
 export type PageAction = {
-  type: 'simpler' | 'example' | 'fix' | 'another' | 'apply' | 'discuss' | 'cancel' | 'defer' | 'dismiss' | 'restore' | 'clear' | 'unclear'
+  type:
+    | 'simpler'
+    | 'example'
+    | 'fix'
+    | 'another'
+    | 'apply'
+    | 'discuss'
+    | 'cancel'
+    | 'defer'
+    | 'dismiss'
+    | 'restore'
+    | 'clear'
+    | 'unclear'
+    | 'ask'
+    | 'approve'
+    | 'unapprove'
+    | 'fixMany'
+    | 'applyMany'
   id: string
+  /** fixMany / applyMany: the findings pressed together. */
+  ids: string[]
   note: string
+  /** ask: put the question through the session, where Claude can read the code. */
+  isDeep: boolean
   /** The explanation the person was reading. */
   version: number
   /** The solution the person was reading. */

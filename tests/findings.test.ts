@@ -7,7 +7,9 @@ import {
   carriedFor,
   DAY,
   EMPTY,
+  contextNote,
   fixAsk,
+  locateHunks,
   normalizeDiff,
   parseAction,
   parseExplanation,
@@ -67,7 +69,7 @@ const FIX = {
   gaps: ['дубли, созданные до фикса'],
 }
 
-type Press = { type: string; id?: string; note?: string; version?: number; fix?: number; lang?: string }
+type Press = { type: string; id?: string; ids?: string[]; note?: string; isDeep?: boolean; version?: number; fix?: number; lang?: string }
 
 type World = {
   files: Map<string, string>
@@ -204,9 +206,12 @@ const finding = (id: string, patch: Partial<Finding> = {}): Finding => ({
   fixes: [],
   status: 'open',
   busy: null,
+  isAsking: false,
+  approved: null,
   isCarried: false,
   check: '',
   log: [],
+  thread: [],
   ...patch,
 })
 
@@ -270,7 +275,8 @@ test('a side answer is read out of the text around its JSON; another example nee
 })
 
 test('a press from the page is read strictly; anything unknown is dropped', async () => {
-  expect(parseAction({ type: 'fix', id: 'R1', note: ' быстро ', version: '2', fix: -1, lang: 'uk' })).toEqual({ type: 'fix', id: 'R1', note: 'быстро', version: 2, fix: 0, lang: 'uk' })
+  expect(parseAction({ type: 'fix', id: 'R1', note: ' быстро ', version: '2', fix: -1, lang: 'uk' })).toEqual({ type: 'fix', id: 'R1', ids: [], note: 'быстро', isDeep: false, version: 2, fix: 0, lang: 'uk' })
+  expect(parseAction({ type: 'fixMany', ids: ['R1', ' ', 'R3'], isDeep: 'yes' })).toMatchObject({ ids: ['R1', 'R3'], isDeep: false })
   expect(parseAction({ type: 'rm -rf', id: 'R1' })).toBe(null)
   expect(parseAction({ type: 'defer', id: 'R1', lang: 'de' })?.lang).toBe('en')
 })
@@ -386,7 +392,16 @@ test('a deferred finding leaves the badge, stays for the branch and rides on the
   expect(project(held).standing.map(entry => [entry.finding.id, entry.finding.status])).toEqual([['R1', 'deferred'], ['R2', 'open']])
 
   await $.prompt.submit({ text: 'почини всё', wait: false, origin: { kind: 'composer' } })
-  expect(held.submitted.at(-1)).toEqual({ text: 'почини всё', context: ['Находки R1 отложены пользователем. Не чини и не поднимай их, пока он сам их не вернёт.'] })
+  expect(held.submitted.at(-1)).toEqual({
+    text: 'почини всё',
+    context: [
+      'Страница «Находки», что пользователь сделал там с прошлого сообщения:\n- R1 «Окно между деплоем и rename»: отложена: после релиза\nОтложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: R1.',
+    ],
+  })
+  expect(shown(held).news).toEqual([])
+
+  await $.prompt.submit({ text: 'и ещё', wait: false, origin: { kind: 'composer' } })
+  expect(held.submitted.at(-1)?.context).toEqual(['Отложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: R1.'])
 
   await press({ type: 'restore' })
   expect(one(held, 'R1').status).toBe('open')
@@ -454,8 +469,10 @@ test('"clear closed" can be undone from the page', async ($, on) => {
 test('a fix asked for a finding of another session carries the finding itself', async () => {
   const carried = finding('R5', { title: 'Сбой отеля', isCarried: true })
 
-  expect(fixAsk(carried, '', ['R2'], 'ru')).toContain('Это находка из прошлой сессии на этой ветке, ты её ещё не видел. Вот она целиком:\nR5 [high] Сбой отеля')
-  expect(fixAsk(carried, '', ['R2'], 'ru')).toMatch(/Находки R2 отложены пользователем/)
+  const note = contextNote({ ...EMPTY, findings: [carried, finding('R2', { status: 'deferred' })] }, 'ru')
+
+  expect(fixAsk(carried, '', 'ru', note)).toContain('Это находка из прошлой сессии на этой ветке, ты её ещё не видел. Вот она целиком:\nR5 [high] Сбой отеля')
+  expect(fixAsk(carried, '', 'ru', note)).toMatch(/Отложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: R2\.$/)
 })
 
 test('a new session of the branch shows what the last one left, and asks about it through chat', async ($, on) => {
@@ -486,4 +503,138 @@ test('the data of the mod under its old name is copied over once, and its findin
   expect(held.files.has(SESSION_FILE)).toBe(true)
   expect(held.files.has(`${old}/sessions/${OWN}.json`)).toBe(true)
   expect(shown(held).findings.map(found => found.title)).toEqual(['Старая находка'])
+})
+
+const REPO_FILE = ['<?php', '', 'class PmsDataRepository', '{', '    public function find()', '    {', "        return PmsData::query()", "            ->where('type', 'property')", '            ->first();', '    }', '}'].join('\n')
+
+test('a diff is laid over the file: found near its header, without caring for indentation; one that does not fit is refused', async () => {
+  expect(locateHunks(REPO_FILE, "@@ -7,2 +7,2 @@\n         return PmsData::query()\n-            ->where('type', 'property')\n+            ->whereIn('type', ['property'])")).toEqual([6])
+  expect(locateHunks(REPO_FILE, normalizeDiff("- ->where('type', 'property')\n+ ->whereIn('type', ['property'])"))).toEqual([7])
+  expect(locateHunks(REPO_FILE, normalizeDiff("- ->where('type', 'listing')\n+ ->whereIn('type', ['x'])"))).toBe(null)
+  expect(locateHunks('', '@@ -0,0 +1,2 @@\n+<?php\n+echo 1;')).toEqual([0])
+  expect(locateHunks(REPO_FILE, "@@ -1,1 +1,1 @@\n-<?php\n+<?php\n@@ -9,1 +9,1 @@\n-            ->first();\n+            ->firstOrFail();")).toEqual([0, 8])
+})
+
+test('a proposed solution carries the file it changes for the whole-file view, but the project file does not', async ($, on) => {
+  const { held } = await started($, on, { '/w/shop/app/PmsDataRepository.php': REPO_FILE })
+  await call($, REPORT, { findings: [RENAME] })
+
+  const proposed = await call($, PROPOSE_FIX, { ...FIX, changes: [...FIX.changes, { path: 'app/Missing.php', diff: '- gone\n+ here' }] })
+
+  expect(one(held, 'R1').fixes[0]?.changes.map(change => change.full?.starts ?? null)).toEqual([[7], null])
+  expect(one(held, 'R1').fixes[0]?.changes[0]?.full?.before).toBe(REPO_FILE)
+  expect(String(proposed.result)).toMatch(/The diff of app\/Missing\.php could not be laid over the file on disk/)
+  expect(project(held).standing[0]?.finding.fixes[0]?.changes.map(change => change.full)).toEqual([null, null])
+})
+
+test('"not a problem" reaches Claude: once as news with the note, and as a standing list on every message', async ($, on) => {
+  const { held, press } = await started($, on)
+  await call($, REPORT, { findings: [RENAME, REBUILD] })
+
+  await press({ type: 'dismiss', id: 'R2', note: 'очередь сама схлопывает дубли' })
+  await press({ type: 'cancel', id: 'R1' })
+  expect(shown(held).news.map(news => [news.what, news.id])).toEqual([['dismiss', 'R2'], ['cancel', 'R1']])
+
+  await $.prompt.submit({ text: 'что дальше?', wait: false, origin: { kind: 'composer' } })
+  expect(held.submitted.at(-1)?.context?.[0]).toBe(
+    [
+      'Страница «Находки», что пользователь сделал там с прошлого сообщения:',
+      '- R2 «Двойная пересборка юнитов»: закрыта как «не проблема»: очередь сама схлопывает дубли',
+      '- R1 «Окно между деплоем и rename»: предложенное решение отменено, по нему ничего не меняй',
+      'Пользователь закрыл как «не проблема», не поднимай их как проблему снова: R2.',
+    ].join('\n'),
+  )
+  expect(shown(held).news).toEqual([])
+})
+
+test('news a press of the page sends goes inside that message, and is not added twice', async ($, on) => {
+  const { held, press } = await started($, on)
+  await call($, REPORT, { findings: [RENAME, REBUILD] })
+  await press({ type: 'defer', id: 'R2', note: 'после релиза' })
+  await press({ type: 'restore', id: 'R2' })
+  await press({ type: 'dismiss', id: 'R2' })
+
+  await press({ type: 'fix', id: 'R1' })
+
+  expect(held.submitted).toHaveLength(1)
+  expect(held.submitted[0]!.context).toBe(undefined)
+  expect(held.submitted[0]!.text).toMatch(/решение не закрывает\.\n\nСтраница «Находки», что пользователь сделал там с прошлого сообщения:\n- R2 «Двойная пересборка юнитов»: закрыта как «не проблема»\nПользователь закрыл/)
+  expect(shown(held).news).toEqual([])
+})
+
+test('a question is answered beside the chat by default, and its answer is told to Claude later', async ($, on) => {
+  const { held, press } = await started($, on)
+  held.forkReply = { isAnswered: true, text: 'Потому что `rename` идёт после деплоя.' }
+  await call($, REPORT, { findings: [RENAME] })
+
+  await press({ type: 'ask', note: 'почему окно вообще есть?' })
+
+  expect(held.submitted).toEqual([])
+  expect(held.forked[0]).toContain('The question: почему окно вообще есть?')
+  expect(one(held, 'R1').thread.map(message => [message.by, message.text, message.via])).toEqual([
+    ['you', 'почему окно вообще есть?', 'side'],
+    ['claude', 'Потому что `rename` идёт после деплоя.', 'side'],
+  ])
+  expect(one(held, 'R1').busy).toBe(null)
+  expect(shown(held).news[0]).toMatchObject({ what: 'ask', id: 'R1', note: 'почему окно вообще есть? → Потому что `rename` идёт после деплоя.' })
+})
+
+test('a question with access to the code goes through the session and comes back through reply', async ($, on) => {
+  const { held, press } = await started($, on)
+  await call($, REPORT, { findings: [RENAME] })
+
+  await press({ type: 'ask', note: 'а где ещё читают property?', isDeep: true })
+
+  expect(held.forked).toEqual([])
+  expect(held.submitted[0]!.text).toBe(
+    'Находка R1 «Окно между деплоем и rename», вопрос: а где ещё читают property?\n\nЕсли нужно, прочитай код и ответь через mcp__findings__reply с id R1; в чат одной строкой.',
+  )
+  expect(one(held, 'R1').isAsking).toBe(true)
+
+  expect((await call($, 'mcp__findings__reply', { id: 'R9', text: 'x' })).deny).toMatch(/No finding/)
+  await call($, 'mcp__findings__reply', { id: 'R1', text: 'В трёх местах: импорт, календарь, вебхук.' })
+  expect(one(held, 'R1').isAsking).toBe(false)
+  expect(one(held, 'R1').thread.at(-1)).toMatchObject({ by: 'claude', via: 'session', text: 'В трёх местах: импорт, календарь, вебхук.' })
+})
+
+test('a side question that gets no answer goes through the session instead', async ($, on) => {
+  const { held, press } = await started($, on)
+  await call($, REPORT, { findings: [RENAME] })
+
+  await press({ type: 'ask', note: 'что сломается первым?' })
+
+  expect(held.forked).toHaveLength(1)
+  expect(held.submitted[0]!.text).toMatch(/^Находка R1 «Окно между деплоем и rename», вопрос: что сломается первым\?/)
+  expect(one(held, 'R1')).toMatchObject({ busy: null, isAsking: true })
+  expect(held.toasts.at(-1)).toBe('Находки: быстрый ответ не получился, запрос ушёл в чат')
+})
+
+test('solutions for several findings are asked in one message, approved one by one and applied together', async ($, on) => {
+  const { held, press } = await started($, on)
+  await call($, REPORT, { findings: [RENAME, REBUILD] })
+
+  await press({ type: 'fixMany', id: '', ids: ['R1', 'R2'] })
+
+  expect(held.submitted).toHaveLength(1)
+  expect(held.submitted[0]!.text).toMatch(/^Находки R1, R2: предложи решение для каждой, отдельным вызовом mcp__findings__propose_fix на находку\./)
+  expect(held.submitted[0]!.text).toContain('- R2 «Двойная пересборка юнитов» (app/PropertyAdapter.php:12)')
+  expect(shown(held).findings.map(found => found.status)).toEqual(['fixing', 'fixing'])
+
+  expect(String((await call($, PROPOSE_FIX, FIX)).result)).toMatch(/Still waiting for solutions: R2\./)
+  await call($, PROPOSE_FIX, { ...FIX, id: 'R2', title: 'Одна пересборка' })
+
+  await press({ type: 'approve', id: 'R1', fix: 0 }, { type: 'approve', id: 'R2', fix: 0 })
+  await press({ type: 'unapprove', id: 'R2' })
+  expect(shown(held).findings.map(found => found.approved)).toEqual([0, null])
+
+  await press({ type: 'approve', id: 'R2', fix: 0 })
+  await press({ type: 'applyMany', id: '', ids: ['R1', 'R2'] })
+
+  expect(held.submitted[1]!.text).toBe(
+    'Применяй одобренные мной решения, по очереди:\n- R1 «Окно между деплоем и rename»: решение «Искать под обоими именами»\n- R2 «Двойная пересборка юнитов»: решение «Одна пересборка»\n\nПосле каждого, когда закончишь и проверишь, вызови mcp__findings__mark_fixed с его id и напиши в check, чем проверил.',
+  )
+  expect(shown(held).findings.map(found => [found.status, found.approved])).toEqual([['applying', 0], ['applying', 0]])
+
+  await call($, MARK_FIXED, { id: 'R1', check: 'тесты 12 из 12' })
+  expect(one(held, 'R1')).toMatchObject({ status: 'fixed', approved: null })
 })

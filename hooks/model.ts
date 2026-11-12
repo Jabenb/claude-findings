@@ -178,6 +178,7 @@ const ACTIONS: readonly PageAction['type'][] = [
   'unapprove',
   'fixMany',
   'applyMany',
+  'tell',
 ]
 const MOMENTS: readonly Moment[] = [
   'reported',
@@ -199,6 +200,7 @@ const MOMENTS: readonly Moment[] = [
   'ask',
   'answered',
   'clear',
+  'tell',
 ]
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
@@ -843,6 +845,7 @@ type Words = {
   question: (question: string) => string
   viaReply: (id: string) => string
   discussion: string
+  tell: string
   newsHead: string
   newsWhat: Partial<Record<Moment, string>>
   standingDismissed: (ids: string) => string
@@ -883,6 +886,7 @@ const WORDS: Record<Lang, Words> = {
     question: question => `question: ${question}`,
     viaReply: id => `Read the code if you need to and answer through ${REPLY} with id ${id}; in chat, one line.`,
     discussion: 'Discussion so far',
+    tell: 'Findings: here is what I did on the page. Take it into account; one line in reply is enough.',
     newsHead: 'Findings page, what the user did there since their last message:',
     newsWhat: {
       dismiss: 'closed as "not a problem"',
@@ -928,6 +932,7 @@ const WORDS: Record<Lang, Words> = {
     question: question => `вопрос: ${question}`,
     viaReply: id => `Если нужно, прочитай код и ответь через ${REPLY} с id ${id}; в чат одной строкой.`,
     discussion: 'Обсуждение до этого',
+    tell: 'Находки: вот что я сделал на странице. Учти это; в ответ хватит одной строки.',
     newsHead: 'Страница «Находки», что пользователь сделал там с прошлого сообщения:',
     newsWhat: {
       dismiss: 'закрыта как «не проблема»',
@@ -973,6 +978,7 @@ const WORDS: Record<Lang, Words> = {
     question: question => `питання: ${question}`,
     viaReply: id => `Якщо треба, прочитай код і відповідай через ${REPLY} з id ${id}; у чат одним рядком.`,
     discussion: 'Обговорення до цього',
+    tell: 'Знахідки: ось що я зробив на сторінці. Врахуй це; у відповідь вистачить одного рядка.',
     newsHead: 'Сторінка «Знахідки», що користувач зробив там з минулого повідомлення:',
     newsWhat: {
       dismiss: 'закрита як «не проблема»',
@@ -1142,6 +1148,9 @@ export const applyManyAsk = (approved: readonly { finding: Finding; fix: Fix }[]
 
   return withContext(`${said.applyMany}\n${named}\n\n${said.applyManyTail}${noteLine(note, lang)}`, context)
 }
+
+/** The message that tells Claude what was done on the page, when nothing else would carry it. */
+export const tellAsk = (lang: Lang, context: string): string => withContext(WORDS[lang].tell, context)
 
 /** The draft put in the prompt box: the person writes their own words under the quote. */
 export const discussText = (finding: Finding, fix: Fix | null, note: string, lang: Lang): string =>

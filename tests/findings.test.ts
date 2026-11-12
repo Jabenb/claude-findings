@@ -227,7 +227,7 @@ const started = async ($: Parameters<TestBody>[0], on: On, files: Record<string,
     await clock.advance(1000)
   }
 
-  return { held, press }
+  return { held, press, clock }
 }
 
 test('a finding without a live example or a place in the code is refused, a full one is numbered on', async () => {
@@ -637,4 +637,53 @@ test('solutions for several findings are asked in one message, approved one by o
 
   await call($, MARK_FIXED, { id: 'R1', check: 'тесты 12 из 12' })
   expect(one(held, 'R1')).toMatchObject({ status: 'fixed', approved: null })
+})
+
+test('once nothing waits, what was done on the page goes to Claude by itself, after time for Undo', async ($, on) => {
+  const { held, press, clock } = await started($, on)
+  await call($, REPORT, { findings: [RENAME, REBUILD] })
+
+  await press({ type: 'dismiss', id: 'R1', note: 'так задумано' })
+  await clock.advance(10_000)
+  expect(held.submitted).toEqual([])
+
+  await press({ type: 'dismiss', id: 'R2' })
+  await clock.advance(3000)
+  expect(held.submitted).toEqual([])
+
+  await clock.advance(3000)
+  expect(held.submitted).toHaveLength(1)
+  expect(held.submitted[0]!.text).toBe(
+    [
+      'Находки: вот что я сделал на странице. Учти это; в ответ хватит одной строки.',
+      '',
+      'Страница «Находки», что пользователь сделал там с прошлого сообщения:',
+      '- R1 «Окно между деплоем и rename»: закрыта как «не проблема»: так задумано',
+      '- R2 «Двойная пересборка юнитов»: закрыта как «не проблема»',
+      'Пользователь закрыл как «не проблема», не поднимай их как проблему снова: R1, R2.',
+    ].join('\n'),
+  )
+  expect(shown(held).news).toEqual([])
+  expect(shown(held).events[0]).toMatchObject({ what: 'tell', id: 'R1, R2' })
+
+  await clock.advance(10_000)
+  expect(held.submitted).toHaveLength(1)
+})
+
+test('an Undo within the wait keeps the news for later, and the button sends it at once', async ($, on) => {
+  const { held, press, clock } = await started($, on)
+  await call($, REPORT, { findings: [RENAME] })
+
+  await press({ type: 'defer', id: 'R1' })
+  await press({ type: 'restore', id: 'R1' })
+  await clock.advance(10_000)
+  expect(held.submitted).toEqual([])
+  expect(shown(held).news.map(news => news.what)).toEqual(['restore'])
+
+  await press({ type: 'tell', id: '' })
+  expect(held.submitted).toHaveLength(1)
+  expect(held.submitted[0]!.text).toMatch(/- R1 «Окно между деплоем и rename»: возвращена в работу$/)
+
+  await press({ type: 'tell', id: '' })
+  expect(held.submitted).toHaveLength(1)
 })

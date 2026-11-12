@@ -47,6 +47,7 @@ export type Moment =
   | 'ask'
   | 'answered'
   | 'clear'
+  | 'tell'
 
 export type Entry = { at: number; by: 'you' | 'claude'; what: Moment; note: string }
 
@@ -110,6 +111,7 @@ export type PageAction = {
     | 'unapprove'
     | 'fixMany'
     | 'applyMany'
+    | 'tell'
   id: string
   /** fixMany / applyMany: the findings pressed together. */
   ids: string[]

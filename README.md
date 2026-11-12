@@ -43,7 +43,9 @@ The code of a solution has three views, switched in the code block's header and 
 
 ### What Claude is told
 
-What you do on the page without sending a message (**Not a problem**, **Set aside**, reopening, cancelling a solution, clearing closed findings, a side question and its answer) is gathered and goes to Claude with your next message, whether you write in the chat or press a button that sends one. Changes go once; the lists of findings closed as "not a problem" and set aside go with every message, so Claude does not raise them again. **Tools and rule for Claude** on the page shows exactly what will go.
+What you do on the page without sending a message (**Not a problem**, **Set aside**, reopening, cancelling a solution, clearing closed findings, a side question and its answer) is gathered and goes to Claude with your next message, whether you write in the chat or press a button that sends one. Changes go once; the lists of findings closed as "not a problem" and set aside go with every message, so Claude does not raise them again.
+
+You do not have to write anything for it to arrive. Above the list a line says what Claude does not know yet, with a **Tell Claude** button that sends it at once. And when you close or set aside the last finding that was waiting for you, it goes by itself six seconds later: time enough for **Undo**. Say you close five findings as "not a problem": right after the fifth, Claude gets one message with all five and your notes. **Tools and rule for Claude** on the page shows exactly what will go.
 
 The list has three groups: **Waiting for you**, **Set aside** and **Closed**; closed findings can be cleared at once (with undo). There are a search, a severity filter, a history per finding, and a side column with what Claude keeps in mind and what went to Claude from the page.
 

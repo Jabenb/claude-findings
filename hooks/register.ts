@@ -49,6 +49,7 @@ import {
   statusLine,
   sweepProject,
   syncProject,
+  tellAsk,
   waitingCount,
   withFile,
   words,
@@ -62,6 +63,8 @@ const COMMAND = 'findings'
 const PULL_WAIT_MS = 5000
 const PULL_STUCK_MS = PULL_WAIT_MS + 10_000
 const ANSWER_IN_NEWS = 300
+/** How long after the last waiting finding is closed or set aside the page's news goes to Claude by itself: time enough for Undo. */
+const AUTO_TELL_MS = 6000
 
 /** The tools as the engine names them; patterns, as a tool this mod registers is not in the types until the mod has loaded once. */
 const REPORT_CALL = new RegExp(`^${REPORT}$`)
@@ -82,6 +85,8 @@ let listening = { since: 0, isFirst: true, isStale: false }
 let dropped: Finding[] = []
 /** While the mod sends a message of its own: that message already carries the page's news, the prompt hook adds nothing. */
 let isDelivering = false
+/** When the page's news goes to Claude by itself (clock time), or 0. */
+let autoTellAt = 0
 let queue: Promise<unknown> = Promise.resolve()
 
 /** Changes run one at a time: each reads the state the one before it left. */
@@ -475,6 +480,35 @@ const withFiles = async ($: EngineInterface, changes: FileChange[]): Promise<Fil
   return Promise.all(changes.map(async change => withFile(change, await readText($, change.path.startsWith('/') ? change.path : `${root}/${change.path}`))))
 }
 
+/** Sends what the person did on the page as a message of its own; nothing when there is no news. */
+const tellNow = async ($: EngineInterface): Promise<void> => {
+  autoTellAt = 0
+
+  if (current.news.length === 0) {
+    return
+  }
+
+  const at = await $.clock.now()
+  const ids = [...new Set(current.news.map(news => news.id))].join(', ')
+
+  if (await deliver($, note => tellAsk(lang, note))) {
+    await dispatch($, { op: 'sent', event: { at, what: 'tell', id: ids, note: '' } })
+  }
+}
+
+/** Once nothing waits for the person, the news goes by itself: they may well never write to Claude again here. */
+const autoTell = async ($: EngineInterface): Promise<void> => {
+  if (autoTellAt === 0 || (await $.clock.now()) < autoTellAt) {
+    return
+  }
+
+  autoTellAt = 0
+
+  if (waitingCount(current.findings) === 0) {
+    await tellNow($)
+  }
+}
+
 /** Presses that reach Claude as a message, or change what Claude is told: listed on the page under "Sent to Claude". */
 const SENT: readonly PageAction['type'][] = ['simpler', 'example', 'fix', 'another', 'apply', 'discuss', 'defer', 'dismiss', 'restore', 'ask', 'cancel']
 
@@ -492,8 +526,11 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
   }
 
   const at = await $.clock.now()
+  const waitingBefore = waitingCount(current.findings)
 
   switch (action.type) {
+    case 'tell':
+      return tellNow($)
     case 'clear': {
       dropped = current.findings.filter(finding => isClosed(finding.status))
       await dispatch($, { op: 'dropClosed' })
@@ -565,6 +602,7 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
     case 'restore':
       await dispatch($, { op: 'status', id: finding.id, status: action.type === 'defer' ? 'deferred' : action.type === 'dismiss' ? 'dismissed' : 'open', entry })
       await tell($, finding, what, action.note, at)
+      autoTellAt = waitingBefore > 0 && waitingCount(current.findings) === 0 ? at + AUTO_TELL_MS : autoTellAt
   }
 }
 
@@ -599,6 +637,7 @@ export const register: Register = on => {
   session = null
   dropped = []
   isDelivering = false
+  autoTellAt = 0
   listening = { since: 0, isFirst: true, isStale: false }
 
   on('session.start', async ($, e, next) => {
@@ -615,7 +654,10 @@ export const register: Register = on => {
     await sweep($)
     await show($)
     $.ui.status(statusLine(current.findings, lang))
-    $.clock.every(1000, () => void listen($).catch(() => undefined))
+    $.clock.every(1000, () => {
+      void listen($).catch(() => undefined)
+      void autoTell($).catch(() => undefined)
+    })
 
     return result
   })

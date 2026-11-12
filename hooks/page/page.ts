@@ -518,7 +518,8 @@ var MORE = {
     rule: ['Две и больше находок (ревью, аудит, расследование) Claude показывает здесь через <code>report</code>, а не списком в чате.', 'Каждую объясняет для человека, не читавшего код: без имён классов, с примером из 3–6 шагов с конкретными значениями и шагом, где ломается.', 'Не меняет код, пока ты не нажал «Применить» или «Применить одобренные». После правки проверяет и только тогда вызывает <code>mark_fixed</code>.', 'Вопрос «с доступом к коду» Claude читает в сессии и отвечает сюда через <code>reply</code>.', 'Что ты сделал на странице без сообщения (не проблема, отложить, вернуть, отмена решения), уходит Claude с твоим следующим сообщением.'],
     tools: [['report', 'Показать находки или новое объяснение существующей.'], ['propose_fix', 'Показать решение в карточке. Код не меняется, пока ты не нажмёшь «Применить».'], ['mark_fixed', 'Отметить находку исправленной: только после «Применить», правки и проверки.'], ['reply', 'Ответить на вопрос «с доступом к коду» в обсуждении карточки.']],
     toolsLbl: 'Четыре инструмента',
-    moment: { reported: 'Нашёл', simpler: 'Не понял, проще', example: 'Другой пример', explained: 'Новое объяснение', fix: 'Чинить', another: 'Другой вариант', proposed: 'Решение', approve: 'Одобрил', unapprove: 'Снял одобрение', apply: 'Применить', fixed: 'Исправлено и проверено', defer: 'Отложил', dismiss: 'Не проблема', restore: 'Вернул в работу', cancel: 'Отменил', discuss: 'Обсудить в чате', ask: 'Вопрос', answered: 'Ответ', clear: 'Убрал со страницы' }
+    newsN: function (n) { return 'Claude ещё не знает: изменений — ' + n }, tellBtn: 'Сообщить Claude', tellHint: 'Уйдёт с твоим следующим сообщением, а когда разобрано всё — само.',
+    moment: { reported: 'Нашёл', simpler: 'Не понял, проще', example: 'Другой пример', explained: 'Новое объяснение', fix: 'Чинить', another: 'Другой вариант', proposed: 'Решение', approve: 'Одобрил', unapprove: 'Снял одобрение', apply: 'Применить', fixed: 'Исправлено и проверено', defer: 'Отложил', dismiss: 'Не проблема', restore: 'Вернул в работу', cancel: 'Отменил', discuss: 'Обсудить в чате', ask: 'Вопрос', answered: 'Ответ', clear: 'Убрал со страницы', tell: 'Сообщил о странице' }
   },
   en: {
     discussion: 'Discussion', askPh: 'Ask about the finding or the solution…', askSend: 'Ask', deep: 'With access to the code',
@@ -538,7 +539,8 @@ var MORE = {
     rule: ['Two or more findings (a review, an audit, an investigation) go here through <code>report</code>, not as a list in chat.', 'Each one is explained for a person who has not read the code: no class names, an example of 3–6 steps with concrete values, and the step where it breaks.', 'No code changes until you press "Apply" or "Apply approved". After the edit Claude checks it, and only then calls <code>mark_fixed</code>.', 'A question "with access to the code" is read in the session, and Claude answers here through <code>reply</code>.', 'What you do on the page without a message (not a problem, set aside, reopen, cancel a solution) goes to Claude with your next message.'],
     tools: [['report', 'Show findings, or a new explanation of one.'], ['propose_fix', 'Show a solution in the card. No code changes until you press "Apply".'], ['mark_fixed', 'Mark a finding fixed: only after "Apply", the edit and a check.'], ['reply', 'Answer a question "with access to the code" in the card\'s discussion.']],
     toolsLbl: 'Four tools',
-    moment: { reported: 'Found it', simpler: 'Simpler, please', example: 'Another example', explained: 'New explanation', fix: 'Fix', another: 'Another option', proposed: 'Solution', approve: 'Approved', unapprove: 'Withdrew approval', apply: 'Apply', fixed: 'Fixed and checked', defer: 'Set aside', dismiss: 'Not a problem', restore: 'Reopened', cancel: 'Cancelled', discuss: 'Discuss in chat', ask: 'Question', answered: 'Answer', clear: 'Removed from the page' }
+    newsN: function (n) { return 'Claude does not know yet: ' + n + (n === 1 ? ' change' : ' changes') }, tellBtn: 'Tell Claude', tellHint: 'Goes with your next message, and by itself once everything is sorted out.',
+    moment: { reported: 'Found it', simpler: 'Simpler, please', example: 'Another example', explained: 'New explanation', fix: 'Fix', another: 'Another option', proposed: 'Solution', approve: 'Approved', unapprove: 'Withdrew approval', apply: 'Apply', fixed: 'Fixed and checked', defer: 'Set aside', dismiss: 'Not a problem', restore: 'Reopened', cancel: 'Cancelled', discuss: 'Discuss in chat', ask: 'Question', answered: 'Answer', clear: 'Removed from the page', tell: 'Told about the page' }
   },
   uk: {
     discussion: 'Обговорення', askPh: 'Запитай про знахідку чи рішення…', askSend: 'Запитати', deep: 'З доступом до коду',
@@ -558,7 +560,8 @@ var MORE = {
     rule: ['Дві й більше знахідок (рев’ю, аудит, розслідування) Claude показує тут через <code>report</code>, а не списком у чаті.', 'Кожну пояснює для людини, яка не читала код: без імен класів, з прикладом із 3–6 кроків з конкретними значеннями й кроком, де ламається.', 'Не змінює код, доки ти не натиснув «Застосувати» чи «Застосувати схвалені». Після правки перевіряє й лише тоді викликає <code>mark_fixed</code>.', 'Питання «з доступом до коду» Claude читає в сесії й відповідає сюди через <code>reply</code>.', 'Що ти зробив на сторінці без повідомлення (не проблема, відкласти, повернути, скасування рішення), іде Claude з твоїм наступним повідомленням.'],
     tools: [['report', 'Показати знахідки або нове пояснення існуючої.'], ['propose_fix', 'Показати рішення в картці. Код не змінюється, доки ти не натиснеш «Застосувати».'], ['mark_fixed', 'Позначити знахідку виправленою: лише після «Застосувати», правки й перевірки.'], ['reply', 'Відповісти на питання «з доступом до коду» в обговоренні картки.']],
     toolsLbl: 'Чотири інструменти',
-    moment: { reported: 'Знайшов', simpler: 'Не зрозумів, простіше', example: 'Інший приклад', explained: 'Нове пояснення', fix: 'Лагодити', another: 'Інший варіант', proposed: 'Рішення', approve: 'Схвалив', unapprove: 'Зняв схвалення', apply: 'Застосувати', fixed: 'Виправлено й перевірено', defer: 'Відклав', dismiss: 'Не проблема', restore: 'Повернув у роботу', cancel: 'Скасував', discuss: 'Обговорити в чаті', ask: 'Питання', answered: 'Відповідь', clear: 'Прибрав зі сторінки' }
+    newsN: function (n) { return 'Claude ще не знає: змін — ' + n }, tellBtn: 'Повідомити Claude', tellHint: 'Піде з твоїм наступним повідомленням, а коли розібрано все — саме.',
+    moment: { reported: 'Знайшов', simpler: 'Не зрозумів, простіше', example: 'Інший приклад', explained: 'Нове пояснення', fix: 'Лагодити', another: 'Інший варіант', proposed: 'Рішення', approve: 'Схвалив', unapprove: 'Зняв схвалення', apply: 'Застосувати', fixed: 'Виправлено й перевірено', defer: 'Відклав', dismiss: 'Не проблема', restore: 'Повернув у роботу', cancel: 'Скасував', discuss: 'Обговорити в чаті', ask: 'Питання', answered: 'Відповідь', clear: 'Прибрав зі сторінки', tell: 'Повідомив про сторінку' }
   }
 }
 Object.keys(MORE).forEach(function (lang) { Object.assign(TEXTS[lang], MORE[lang]) })
@@ -1005,15 +1008,20 @@ function cardHTML(f) {
 }
 
 function bulkHTML() {
-  var t = T(), picked = pickedIds(), approved = approvedIds(), busy = isPending('*')
-  if (!picked.length && !approved.length) return ''
+  var t = T(), picked = pickedIds(), approved = approvedIds(), busy = isPending('*'), news = state.news || []
+  if (!picked.length && !approved.length && !news.length) return ''
   var h = '<div class="bulk" data-key="bulk">'
+  if (news.length) {
+    var ids = news.map(function (n) { return n.id }).filter(function (id, i, all) { return all.indexOf(id) === i })
+    h += '<div class="brow" data-key="b-news"><span class="bcount">' + esc(t.newsN(news.length)) + ' <span class="mono">' + esc(ids.join(', ')) + '</span></span><span class="bhint">' + esc(t.tellHint) + '</span><span class="sp"></span>' +
+      '<button class="btn" type="button" data-tell' + (busy ? ' disabled' : '') + '>' + icon('chat') + esc(t.tellBtn) + '</button></div>'
+  }
   if (picked.length) {
-    h += '<div class="brow"><span class="bcount">' + esc(t.picked(picked.length)) + ' <span class="mono">' + esc(picked.join(', ')) + '</span></span><span class="bhint">' + esc(t.bulkHint) + '</span><span class="sp"></span>' +
+    h += '<div class="brow" data-key="b-picked"><span class="bcount">' + esc(t.picked(picked.length)) + ' <span class="mono">' + esc(picked.join(', ')) + '</span></span><span class="bhint">' + esc(t.bulkHint) + '</span><span class="sp"></span>' +
       '<button class="btn quiet" type="button" data-unpick>' + esc(t.unpick) + '</button><button class="btn primary" type="button" data-fixmany' + (busy ? ' disabled' : '') + '>' + icon('wrench') + esc(t.prepareN) + '</button></div>'
   }
   if (approved.length) {
-    h += '<div class="brow"><span class="bcount">' + esc(t.approvedN(approved.length)) + ' <span class="mono">' + esc(approved.join(', ')) + '</span></span><span class="bhint">' + esc(t.approveHint) + '</span><span class="sp"></span>' +
+    h += '<div class="brow" data-key="b-approved"><span class="bcount">' + esc(t.approvedN(approved.length)) + ' <span class="mono">' + esc(approved.join(', ')) + '</span></span><span class="bhint">' + esc(t.approveHint) + '</span><span class="sp"></span>' +
       '<button class="btn primary" type="button" data-applymany' + (busy ? ' disabled' : '') + '>' + icon('check') + esc(t.applyApproved) + '</button></div>'
   }
   return h + '</div>'
@@ -1154,7 +1162,7 @@ function setMode(mode) {
 }
 
 document.addEventListener('click', function (e) {
-  var el = e.target.closest('[data-pick],[data-tab],[data-sel],[data-act],[data-ver],[data-fix],[data-file],[data-copy],[data-sev],[data-copylist],[data-clear],[data-drawer],[data-close],[data-mode],[data-unfold],[data-askbtn],[data-pickall],[data-unpick],[data-fixmany],[data-applymany],#scrim')
+  var el = e.target.closest('[data-pick],[data-tab],[data-sel],[data-act],[data-ver],[data-fix],[data-file],[data-copy],[data-sev],[data-copylist],[data-clear],[data-drawer],[data-close],[data-mode],[data-unfold],[data-askbtn],[data-pickall],[data-unpick],[data-fixmany],[data-applymany],[data-tell],#scrim')
   if (!el || el.disabled) return
   var d = el.dataset, f = byId(S.sel[S.tab])
   if (d.pick) { S.picked[d.pick] = !S.picked[d.pick]; renderMain(); return }
@@ -1176,6 +1184,7 @@ document.addEventListener('click', function (e) {
     if (ids.length) send(press('fixMany', { ids: ids }), '*').then(function (sent) { if (sent) { S.picked = {}; renderMain() } })
     return
   }
+  if (el.hasAttribute('data-tell')) { send(press('tell'), '*'); return }
   if (el.hasAttribute('data-applymany')) { var ok = approvedIds(); if (ok.length) send(press('applyMany', { ids: ok }), '*'); return }
   if (el.hasAttribute('data-copylist')) {
     copy(inTab(S.tab).map(function (x) { return '[' + x.id + '] ' + T().sev[x.severity] + ' — ' + x.title + '\n  ' + x.where + '\n  ' + bare(x.versions[viewOf(x).vi].plain) }).join('\n\n'), T().listCopied)

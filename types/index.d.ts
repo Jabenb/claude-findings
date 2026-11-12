@@ -51,8 +51,8 @@ export type Moment =
 
 export type Entry = { at: number; by: 'you' | 'claude'; what: Moment; note: string }
 
-/** One message of the discussion under a finding. `side`: answered beside the chat; `session`: asked through the session, where Claude can read the code. */
-export type Message = { at: number; by: 'you' | 'claude'; text: string; via: 'side' | 'session' }
+/** One message of the discussion under a finding. A queued question waits on the page until it is sent together with the others. */
+export type Message = { at: number; by: 'you' | 'claude'; text: string; isQueued: boolean }
 
 export type Finding = {
   id: string
@@ -63,9 +63,9 @@ export type Finding = {
   versions: Explanation[]
   fixes: Fix[]
   status: Status
-  /** A side answer is being written: the page shows Claude typing. */
-  busy: 'simpler' | 'example' | 'ask' | null
-  /** A question asked through the session waits for its answer. */
+  /** A side explanation is being written: the page shows Claude typing. */
+  busy: 'simpler' | 'example' | null
+  /** Questions sent through the session wait for the answer. */
   isAsking: boolean
   /** The solution the person approved for a batch apply (its index), or null. */
   approved: number | null
@@ -107,6 +107,9 @@ export type PageAction = {
     | 'clear'
     | 'unclear'
     | 'ask'
+    | 'queue'
+    | 'unqueue'
+    | 'askAll'
     | 'approve'
     | 'unapprove'
     | 'fixMany'
@@ -116,8 +119,8 @@ export type PageAction = {
   /** fixMany / applyMany: the findings pressed together. */
   ids: string[]
   note: string
-  /** ask: put the question through the session, where Claude can read the code. */
-  isDeep: boolean
+  /** unqueue: the time of the queued question to take back. */
+  at: number
   /** The explanation the person was reading. */
   version: number
   /** The solution the person was reading. */

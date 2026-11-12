@@ -298,8 +298,11 @@ pre.pre{margin:0;padding:12px 14px;font:12px/1.6 var(--f-mono);overflow-x:auto;w
 .btn.on{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok)}
 .ask textarea{display:block;min-height:42px;max-height:160px;resize:none;padding:10px 14px;font-size:14px;line-height:1.5;border-radius:12px}
 .askbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
-.deep{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none}
-.deep input{accent-color:var(--sugg);margin:0}
+
+.thread .qd{font-size:11.5px;color:var(--sugg)}
+.thread .unq{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
+.thread .unq:hover{color:var(--text)}
+.thread .tx.q{border-style:dashed;border-color:var(--sugg-line)}
 .askhint{font-size:12px;color:var(--faint)}
 .chat .tx p{margin:0 0 6px}
 .chat .tx p:last-child{margin:0}
@@ -501,9 +504,10 @@ var TEXTS = {
 
 var MORE = {
   ru: {
-    discussion: 'Обсуждение', askPh: 'Спроси про находку или решение…', askSend: 'Спросить', deep: 'С доступом к коду',
-    sideHint: 'Ответ придёт сюда, в чат ничего не уйдёт', deepHint: 'Вопрос уйдёт в чат сессии: Claude прочитает код и ответит сюда',
-    thinking: 'Claude думает над ответом…', askingDeep: 'Вопрос ушёл в сессию, Claude читает код…', viaSide: 'сбоку', viaSession: 'с кодом',
+    discussion: 'Обсуждение', askPh: 'Спроси про находку или решение…', askSend: 'Спросить', queueBtn: 'В очередь',
+    askHint: 'Вопрос уходит в чат сессии: Claude прочитает код и ответит сюда. «В очередь» копит вопросы, чтобы отправить их одним сообщением.',
+    askingDeep: 'Вопрос ушёл в сессию, Claude читает код…', queuedTag: 'ждёт отправки', unqueue: 'Убрать',
+    questionsN: function (n) { return 'Вопросов в очереди: ' + n }, questionsHint: 'Уйдут одним сообщением, Claude ответит в каждую карточку.', sendQuestions: 'Отправить вопросы',
     mode: { unified: 'Одна колонка', split: 'Две колонки', full: 'Файл целиком' }, noFull: 'Дифф не ложится на файл на диске (или файл не прочитан), поэтому файл целиком не показан.',
     fold: function (n) { return 'Ещё ' + n + ' строк без изменений' }, beforeLbl: 'Было', afterLbl: 'Стало', fileAt: 'файл на момент, когда решение было предложено',
     pickAll: 'Выбрать все', picked: function (n) { return 'Выбрано: ' + n }, prepareN: 'Подготовить решения', unpick: 'Снять выбор',
@@ -515,16 +519,17 @@ var MORE = {
     newsWhat: { dismiss: 'закрыта как «не проблема»', defer: 'отложена', restore: 'возвращена в работу', cancel: 'предложенное решение отменено, по нему ничего не меняй', clear: 'убрана со страницы (была закрыта)', ask: 'вопрос сбоку от чата' },
     standingDismissed: function (ids) { return 'Пользователь закрыл как «не проблема», не поднимай их как проблему снова: ' + ids + '.' },
     standingDeferred: function (ids) { return 'Отложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: ' + ids + '.' },
-    rule: ['Две и больше находок (ревью, аудит, расследование) Claude показывает здесь через <code>report</code>, а не списком в чате.', 'Каждую объясняет для человека, не читавшего код: без имён классов, с примером из 3–6 шагов с конкретными значениями и шагом, где ломается.', 'Не меняет код, пока ты не нажал «Применить» или «Применить одобренные». После правки проверяет и только тогда вызывает <code>mark_fixed</code>.', 'Вопрос «с доступом к коду» Claude читает в сессии и отвечает сюда через <code>reply</code>.', 'Что ты сделал на странице без сообщения (не проблема, отложить, вернуть, отмена решения), уходит Claude с твоим следующим сообщением.'],
-    tools: [['report', 'Показать находки или новое объяснение существующей.'], ['propose_fix', 'Показать решение в карточке. Код не меняется, пока ты не нажмёшь «Применить».'], ['mark_fixed', 'Отметить находку исправленной: только после «Применить», правки и проверки.'], ['reply', 'Ответить на вопрос «с доступом к коду» в обсуждении карточки.']],
+    rule: ['Две и больше находок (ревью, аудит, расследование) Claude показывает здесь через <code>report</code>, а не списком в чате.', 'Каждую объясняет для человека, не читавшего код: без имён классов, с примером из 3–6 шагов с конкретными значениями и шагом, где ломается.', 'Не меняет код, пока ты не нажал «Применить» или «Применить одобренные». После правки проверяет и только тогда вызывает <code>mark_fixed</code>.', 'Вопросы уходят в сессию (по одному или пачкой из очереди), Claude читает код и отвечает сюда через <code>reply</code>.', 'Что ты сделал на странице без сообщения (не проблема, отложить, вернуть, отмена решения), уходит Claude с твоим следующим сообщением.'],
+    tools: [['report', 'Показать находки или новое объяснение существующей.'], ['propose_fix', 'Показать решение в карточке. Код не меняется, пока ты не нажмёшь «Применить».'], ['mark_fixed', 'Отметить находку исправленной: только после «Применить», правки и проверки.'], ['reply', 'Ответить на вопрос в обсуждении карточки.']],
     toolsLbl: 'Четыре инструмента',
     newsN: function (n) { return 'Claude ещё не знает: изменений — ' + n }, tellBtn: 'Сообщить Claude', tellHint: 'Уйдёт с твоим следующим сообщением, а когда разобрано всё — само.',
     moment: { reported: 'Нашёл', simpler: 'Не понял, проще', example: 'Другой пример', explained: 'Новое объяснение', fix: 'Чинить', another: 'Другой вариант', proposed: 'Решение', approve: 'Одобрил', unapprove: 'Снял одобрение', apply: 'Применить', fixed: 'Исправлено и проверено', defer: 'Отложил', dismiss: 'Не проблема', restore: 'Вернул в работу', cancel: 'Отменил', discuss: 'Обсудить в чате', ask: 'Вопрос', answered: 'Ответ', clear: 'Убрал со страницы', tell: 'Сообщил о странице' }
   },
   en: {
-    discussion: 'Discussion', askPh: 'Ask about the finding or the solution…', askSend: 'Ask', deep: 'With access to the code',
-    sideHint: 'The answer comes here, nothing goes to the chat', deepHint: 'The question goes to the session chat: Claude reads the code and answers here',
-    thinking: 'Claude is thinking…', askingDeep: 'The question went to the session, Claude is reading the code…', viaSide: 'beside', viaSession: 'with code',
+    discussion: 'Discussion', askPh: 'Ask about the finding or the solution…', askSend: 'Ask', queueBtn: 'Queue',
+    askHint: 'The question goes to the session chat: Claude reads the code and answers here. "Queue" collects questions to send them in one message.',
+    askingDeep: 'The question went to the session, Claude is reading the code…', queuedTag: 'not sent yet', unqueue: 'Remove',
+    questionsN: function (n) { return 'Questions queued: ' + n }, questionsHint: 'They go in one message, Claude answers in each card.', sendQuestions: 'Send questions',
     mode: { unified: 'One column', split: 'Two columns', full: 'Whole file' }, noFull: 'The diff does not fit the file on disk (or the file was not read), so the whole file is not shown.',
     fold: function (n) { return n + ' more unchanged lines' }, beforeLbl: 'Before', afterLbl: 'After', fileAt: 'the file as it was when the solution was proposed',
     pickAll: 'Select all', picked: function (n) { return n + ' selected' }, prepareN: 'Prepare solutions', unpick: 'Clear selection',
@@ -536,16 +541,17 @@ var MORE = {
     newsWhat: { dismiss: 'closed as "not a problem"', defer: 'set aside', restore: 'reopened', cancel: 'the proposed solution is cancelled, change nothing for it', clear: 'removed from the page (it was closed)', ask: 'asked beside the chat' },
     standingDismissed: function (ids) { return 'Closed by the user as "not a problem", do not raise them as problems again: ' + ids + '.' },
     standingDeferred: function (ids) { return 'Set aside by the user, do not fix or raise them until the user brings them back: ' + ids + '.' },
-    rule: ['Two or more findings (a review, an audit, an investigation) go here through <code>report</code>, not as a list in chat.', 'Each one is explained for a person who has not read the code: no class names, an example of 3–6 steps with concrete values, and the step where it breaks.', 'No code changes until you press "Apply" or "Apply approved". After the edit Claude checks it, and only then calls <code>mark_fixed</code>.', 'A question "with access to the code" is read in the session, and Claude answers here through <code>reply</code>.', 'What you do on the page without a message (not a problem, set aside, reopen, cancel a solution) goes to Claude with your next message.'],
-    tools: [['report', 'Show findings, or a new explanation of one.'], ['propose_fix', 'Show a solution in the card. No code changes until you press "Apply".'], ['mark_fixed', 'Mark a finding fixed: only after "Apply", the edit and a check.'], ['reply', 'Answer a question "with access to the code" in the card\'s discussion.']],
+    rule: ['Two or more findings (a review, an audit, an investigation) go here through <code>report</code>, not as a list in chat.', 'Each one is explained for a person who has not read the code: no class names, an example of 3–6 steps with concrete values, and the step where it breaks.', 'No code changes until you press "Apply" or "Apply approved". After the edit Claude checks it, and only then calls <code>mark_fixed</code>.', 'Questions go to the session (one at a time or a batch from the queue), Claude reads the code and answers here through <code>reply</code>.', 'What you do on the page without a message (not a problem, set aside, reopen, cancel a solution) goes to Claude with your next message.'],
+    tools: [['report', 'Show findings, or a new explanation of one.'], ['propose_fix', 'Show a solution in the card. No code changes until you press "Apply".'], ['mark_fixed', 'Mark a finding fixed: only after "Apply", the edit and a check.'], ['reply', 'Answer a question in the card\'s discussion.']],
     toolsLbl: 'Four tools',
     newsN: function (n) { return 'Claude does not know yet: ' + n + (n === 1 ? ' change' : ' changes') }, tellBtn: 'Tell Claude', tellHint: 'Goes with your next message, and by itself once everything is sorted out.',
     moment: { reported: 'Found it', simpler: 'Simpler, please', example: 'Another example', explained: 'New explanation', fix: 'Fix', another: 'Another option', proposed: 'Solution', approve: 'Approved', unapprove: 'Withdrew approval', apply: 'Apply', fixed: 'Fixed and checked', defer: 'Set aside', dismiss: 'Not a problem', restore: 'Reopened', cancel: 'Cancelled', discuss: 'Discuss in chat', ask: 'Question', answered: 'Answer', clear: 'Removed from the page', tell: 'Told about the page' }
   },
   uk: {
-    discussion: 'Обговорення', askPh: 'Запитай про знахідку чи рішення…', askSend: 'Запитати', deep: 'З доступом до коду',
-    sideHint: 'Відповідь прийде сюди, у чат нічого не піде', deepHint: 'Питання піде в чат сесії: Claude прочитає код і відповість сюди',
-    thinking: 'Claude думає над відповіддю…', askingDeep: 'Питання пішло в сесію, Claude читає код…', viaSide: 'збоку', viaSession: 'з кодом',
+    discussion: 'Обговорення', askPh: 'Запитай про знахідку чи рішення…', askSend: 'Запитати', queueBtn: 'У чергу',
+    askHint: 'Питання йде в чат сесії: Claude прочитає код і відповість сюди. «У чергу» збирає питання, щоб надіслати їх одним повідомленням.',
+    askingDeep: 'Питання пішло в сесію, Claude читає код…', queuedTag: 'чекає надсилання', unqueue: 'Прибрати',
+    questionsN: function (n) { return 'Питань у черзі: ' + n }, questionsHint: 'Підуть одним повідомленням, Claude відповість у кожну картку.', sendQuestions: 'Надіслати питання',
     mode: { unified: 'Одна колонка', split: 'Дві колонки', full: 'Файл повністю' }, noFull: 'Диф не лягає на файл на диску (або файл не прочитано), тому файл повністю не показано.',
     fold: function (n) { return 'Ще ' + n + ' рядків без змін' }, beforeLbl: 'Було', afterLbl: 'Стало', fileAt: 'файл на момент, коли рішення запропоновано',
     pickAll: 'Вибрати всі', picked: function (n) { return 'Вибрано: ' + n }, prepareN: 'Підготувати рішення', unpick: 'Зняти вибір',
@@ -557,8 +563,8 @@ var MORE = {
     newsWhat: { dismiss: 'закрита як «не проблема»', defer: 'відкладена', restore: 'повернута в роботу', cancel: 'запропоноване рішення скасовано, нічого за ним не змінюй', clear: 'прибрана зі сторінки (була закрита)', ask: 'питання збоку від чату' },
     standingDismissed: function (ids) { return 'Користувач закрив як «не проблема», не піднімай їх як проблему знову: ' + ids + '.' },
     standingDeferred: function (ids) { return 'Відкладені користувачем, не лагодь і не піднімай їх, доки він сам їх не поверне: ' + ids + '.' },
-    rule: ['Дві й більше знахідок (рев’ю, аудит, розслідування) Claude показує тут через <code>report</code>, а не списком у чаті.', 'Кожну пояснює для людини, яка не читала код: без імен класів, з прикладом із 3–6 кроків з конкретними значеннями й кроком, де ламається.', 'Не змінює код, доки ти не натиснув «Застосувати» чи «Застосувати схвалені». Після правки перевіряє й лише тоді викликає <code>mark_fixed</code>.', 'Питання «з доступом до коду» Claude читає в сесії й відповідає сюди через <code>reply</code>.', 'Що ти зробив на сторінці без повідомлення (не проблема, відкласти, повернути, скасування рішення), іде Claude з твоїм наступним повідомленням.'],
-    tools: [['report', 'Показати знахідки або нове пояснення існуючої.'], ['propose_fix', 'Показати рішення в картці. Код не змінюється, доки ти не натиснеш «Застосувати».'], ['mark_fixed', 'Позначити знахідку виправленою: лише після «Застосувати», правки й перевірки.'], ['reply', 'Відповісти на питання «з доступом до коду» в обговоренні картки.']],
+    rule: ['Дві й більше знахідок (рев’ю, аудит, розслідування) Claude показує тут через <code>report</code>, а не списком у чаті.', 'Кожну пояснює для людини, яка не читала код: без імен класів, з прикладом із 3–6 кроків з конкретними значеннями й кроком, де ламається.', 'Не змінює код, доки ти не натиснув «Застосувати» чи «Застосувати схвалені». Після правки перевіряє й лише тоді викликає <code>mark_fixed</code>.', 'Питання йдуть у сесію (по одному чи пачкою з черги), Claude читає код і відповідає сюди через <code>reply</code>.', 'Що ти зробив на сторінці без повідомлення (не проблема, відкласти, повернути, скасування рішення), іде Claude з твоїм наступним повідомленням.'],
+    tools: [['report', 'Показати знахідки або нове пояснення існуючої.'], ['propose_fix', 'Показати рішення в картці. Код не змінюється, доки ти не натиснеш «Застосувати».'], ['mark_fixed', 'Позначити знахідку виправленою: лише після «Застосувати», правки й перевірки.'], ['reply', 'Відповісти на питання в обговоренні картки.']],
     toolsLbl: 'Чотири інструменти',
     newsN: function (n) { return 'Claude ще не знає: змін — ' + n }, tellBtn: 'Повідомити Claude', tellHint: 'Піде з твоїм наступним повідомленням, а коли розібрано все — саме.',
     moment: { reported: 'Знайшов', simpler: 'Не зрозумів, простіше', example: 'Інший приклад', explained: 'Нове пояснення', fix: 'Лагодити', another: 'Інший варіант', proposed: 'Рішення', approve: 'Схвалив', unapprove: 'Зняв схвалення', apply: 'Застосувати', fixed: 'Виправлено й перевірено', defer: 'Відклав', dismiss: 'Не проблема', restore: 'Повернув у роботу', cancel: 'Скасував', discuss: 'Обговорити в чаті', ask: 'Питання', answered: 'Відповідь', clear: 'Прибрав зі сторінки', tell: 'Повідомив про сторінку' }
@@ -925,18 +931,19 @@ function threadHTML(f) {
   var h = '<section class="sec" data-key="discussion"><span class="lbl">' + esc(t.discussion) + '</span>'
   if (f.thread.length) {
     h += '<ol class="thread chat">' + f.thread.map(function (m, i) {
-      var c = m.by === 'claude'
-      return '<li data-key="msg-' + i + '"><span class="av ' + (c ? 'c' : 'y') + '">' + (c ? I.claude : esc(t.you.charAt(0))) + '</span><div class="m"><span class="nm"><b class="' + (c ? 'c' : '') + '">' + (c ? 'Claude' : esc(t.you)) + '</b> · <span class="mono">' + hhmm(m.at) + '</span> · ' + esc(m.via === 'session' ? t.viaSession : t.viaSide) + '</span><div class="tx' + (c ? ' c' : '') + '">' + (c ? rich(m.text) : esc(m.text)) + '</div></div></li>'
+      var c = m.by === 'claude', q = !c && m.isQueued
+      return '<li data-key="msg-' + i + '"><span class="av ' + (c ? 'c' : 'y') + '">' + (c ? I.claude : esc(t.you.charAt(0))) + '</span><div class="m"><span class="nm"><b class="' + (c ? 'c' : '') + '">' + (c ? 'Claude' : esc(t.you)) + '</b> · <span class="mono">' + hhmm(m.at) + '</span>' +
+        (q ? ' · <span class="qd">' + esc(t.queuedTag) + '</span> <button class="unq" type="button" data-unqueue="' + f.id + '" data-at="' + m.at + '">' + esc(t.unqueue) + '</button>' : '') +
+        '</span><div class="tx' + (c ? ' c' : '') + (q ? ' q' : '') + '">' + (c ? rich(m.text) : esc(m.text)) + '</div></div></li>'
     }).join('') + '</ol>'
   }
-  if (f.busy === 'ask') h += typing(t.thinking)
-  else if (f.isAsking) h += typing(t.askingDeep)
-  var draft = asks[f.id] || { text: '', isDeep: false }
-  var locked = f.busy === 'ask' || f.isAsking || isPending(f.id)
+  if (f.isAsking) h += typing(t.askingDeep)
+  var draft = asks[f.id] || { text: '' }
+  var locked = f.isAsking || isPending(f.id), empty = !draft.text.trim(), queued = f.thread.some(function (m) { return m.isQueued })
   h += '<div class="ask" data-key="ask-' + f.id + '"><textarea class="field" rows="1" data-ask="' + f.id + '" placeholder="' + esc(t.askPh) + '">' + esc(draft.text) + '</textarea>' +
-    '<div class="askbar"><label class="deep"><input type="checkbox" data-deep="' + f.id + '"' + (draft.isDeep || f.isCarried ? ' checked' : '') + (f.isCarried ? ' disabled' : '') + '><span>' + esc(t.deep) + '</span></label>' +
-    '<span class="askhint">' + esc(draft.isDeep || f.isCarried ? t.deepHint : t.sideHint) + '</span><span class="sp"></span>' +
-    '<button class="btn" type="button" data-askbtn="' + f.id + '"' + (locked || !draft.text.trim() ? ' disabled' : '') + '>' + icon('chat') + esc(t.askSend) + '<span class="kk">⌘↵</span></button></div></div>'
+    '<div class="askbar"><span class="askhint">' + esc(t.askHint) + '</span><span class="sp"></span>' +
+    '<button class="btn quiet" type="button" data-queuebtn="' + f.id + '"' + (isPending(f.id) || empty ? ' disabled' : '') + '>' + esc(t.queueBtn) + '</button>' +
+    '<button class="btn" type="button" data-askbtn="' + f.id + '"' + (locked || (empty && !queued) ? ' disabled' : '') + '>' + icon('chat') + esc(t.askSend) + '<span class="kk">⌘↵</span></button></div></div>'
   return h + '</section>'
 }
 
@@ -1007,14 +1014,25 @@ function cardHTML(f) {
   return h
 }
 
+function queuedIds() {
+  return (state.findings || []).filter(function (f) { return !f.isAsking && f.thread.some(function (m) { return m.isQueued }) }).map(function (f) { return f.id })
+}
+function queuedCount() {
+  return (state.findings || []).reduce(function (n, f) { return f.isAsking ? n : n + f.thread.filter(function (m) { return m.isQueued }).length }, 0)
+}
 function bulkHTML() {
   var t = T(), picked = pickedIds(), approved = approvedIds(), busy = isPending('*'), news = state.news || []
-  if (!picked.length && !approved.length && !news.length) return ''
+  var questions = queuedIds()
+  if (!picked.length && !approved.length && !news.length && !questions.length) return ''
   var h = '<div class="bulk" data-key="bulk">'
   if (news.length) {
     var ids = news.map(function (n) { return n.id }).filter(function (id, i, all) { return all.indexOf(id) === i })
     h += '<div class="brow" data-key="b-news"><span class="bcount">' + esc(t.newsN(news.length)) + ' <span class="mono">' + esc(ids.join(', ')) + '</span></span><span class="bhint">' + esc(t.tellHint) + '</span><span class="sp"></span>' +
       '<button class="btn" type="button" data-tell' + (busy ? ' disabled' : '') + '>' + icon('chat') + esc(t.tellBtn) + '</button></div>'
+  }
+  if (questions.length) {
+    h += '<div class="brow" data-key="b-questions"><span class="bcount">' + esc(t.questionsN(queuedCount())) + ' <span class="mono">' + esc(questions.join(', ')) + '</span></span><span class="bhint">' + esc(t.questionsHint) + '</span><span class="sp"></span>' +
+      '<button class="btn primary" type="button" data-askall' + (busy ? ' disabled' : '') + '>' + icon('chat') + esc(t.sendQuestions) + '</button></div>'
   }
   if (picked.length) {
     h += '<div class="brow" data-key="b-picked"><span class="bcount">' + esc(t.picked(picked.length)) + ' <span class="mono">' + esc(picked.join(', ')) + '</span></span><span class="bhint">' + esc(t.bulkHint) + '</span><span class="sp"></span>' +
@@ -1106,7 +1124,7 @@ $('toastUndo').onclick = function () { if (undoFn) undoFn(); undoFn = null; $('t
 
 /* ---------- presses ---------- */
 function press(type, extra) {
-  var data = { type: type, id: '', ids: [], note: '', isDeep: false, version: 0, fix: 0, lang: hub.lang }
+  var data = { type: type, id: '', ids: [], note: '', at: 0, version: 0, fix: 0, lang: hub.lang }
   for (var k in extra) data[k] = extra[k]
   return data
 }
@@ -1132,13 +1150,13 @@ function act(kind) {
     renderMain()
   })
 }
-function ask(id) {
-  var f = byId(id), draft = asks[id]
-  if (!f || !draft || !draft.text.trim() || f.busy === 'ask' || f.isAsking || isPending(id)) return
-  var v = viewOf(f)
-  send(press('ask', { id: id, note: draft.text.trim(), isDeep: draft.isDeep || f.isCarried, version: v.vi, fix: v.fi }), id).then(function (sent) {
+function ask(id, kind) {
+  var f = byId(id), draft = asks[id] || { text: '' }, note = draft.text.trim()
+  if (!f || isPending(id)) return
+  if (kind === 'queue' ? !note : (f.isAsking || (!note && !f.thread.some(function (m) { return m.isQueued })))) return
+  send(press(kind, { id: id, note: note }), id).then(function (sent) {
     if (!sent) return
-    asks[id] = { text: '', isDeep: draft.isDeep }
+    asks[id] = { text: '' }
     var ta = document.querySelector('textarea[data-ask="' + id + '"]')
     if (ta) { ta.value = ''; autosize(ta) }
     renderMain()
@@ -1162,7 +1180,7 @@ function setMode(mode) {
 }
 
 document.addEventListener('click', function (e) {
-  var el = e.target.closest('[data-pick],[data-tab],[data-sel],[data-act],[data-ver],[data-fix],[data-file],[data-copy],[data-sev],[data-copylist],[data-clear],[data-drawer],[data-close],[data-mode],[data-unfold],[data-askbtn],[data-pickall],[data-unpick],[data-fixmany],[data-applymany],[data-tell],#scrim')
+  var el = e.target.closest('[data-pick],[data-tab],[data-sel],[data-act],[data-ver],[data-fix],[data-file],[data-copy],[data-sev],[data-copylist],[data-clear],[data-drawer],[data-close],[data-mode],[data-unfold],[data-askbtn],[data-queuebtn],[data-unqueue],[data-askall],[data-pickall],[data-unpick],[data-fixmany],[data-applymany],[data-tell],#scrim')
   if (!el || el.disabled) return
   var d = el.dataset, f = byId(S.sel[S.tab])
   if (d.pick) { S.picked[d.pick] = !S.picked[d.pick]; renderMain(); return }
@@ -1170,7 +1188,10 @@ document.addEventListener('click', function (e) {
   if (d.sev) { S.sev = d.sev; renderMain(); return }
   if (d.sel) { S.sel[S.tab] = d.sel; renderMain(); scrollToCard(); return }
   if (d.act) { act(d.act); return }
-  if (d.askbtn) { ask(d.askbtn); return }
+  if (d.askbtn) { ask(d.askbtn, 'ask'); return }
+  if (d.queuebtn) { ask(d.queuebtn, 'queue'); return }
+  if (d.unqueue) { send(press('unqueue', { id: d.unqueue, at: Number(d.at) || 0 }), d.unqueue); return }
+  if (d.askall !== undefined) { if (queuedIds().length) send(press('askAll', {}), '*'); return }
   if (d.mode) { setMode(d.mode); return }
   if (d.unfold) { S.unfolded[d.unfold] = true; renderMain(); return }
   if (d.ver && f) { viewOf(f).vi = Number(d.ver); renderMain(); return }
@@ -1202,10 +1223,6 @@ document.addEventListener('click', function (e) {
   if (el.hasAttribute('data-close') || el.id === 'scrim') { S.drawer = false; renderDrawer() }
 })
 document.addEventListener('toggle', function (e) { if (e.target.matches && e.target.matches('details.keys')) S.keysOpen = e.target.open }, true)
-document.addEventListener('change', function (e) {
-  var el = e.target
-  if (el.dataset && el.dataset.deep) { var a = asks[el.dataset.deep] || (asks[el.dataset.deep] = { text: '', isDeep: false }); a.isDeep = el.checked; renderMain() }
-})
 document.addEventListener('input', function (e) {
   var el = e.target
   if (el.id === 'q') { S.q = el.value.trim().toLowerCase(); renderMain(); return }
@@ -1217,7 +1234,7 @@ document.addEventListener('input', function (e) {
     return
   }
   if (el.dataset && el.dataset.ask) {
-    var a = asks[el.dataset.ask] || (asks[el.dataset.ask] = { text: '', isDeep: false })
+    var a = asks[el.dataset.ask] || (asks[el.dataset.ask] = { text: '' })
     var wasEmpty = !a.text.trim()
     a.text = el.value
     autosize(el)
@@ -1227,7 +1244,7 @@ document.addEventListener('input', function (e) {
 document.addEventListener('keydown', function (e) {
   var tag = e.target.tagName, isTyping = tag === 'TEXTAREA' || tag === 'INPUT'
   if (e.key === 'Escape') { if (S.drawer) { S.drawer = false; renderDrawer(); return } if (isTyping) e.target.blur(); return }
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && e.target.dataset && e.target.dataset.ask) { e.preventDefault(); ask(e.target.dataset.ask); return }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && e.target.dataset && e.target.dataset.ask) { e.preventDefault(); ask(e.target.dataset.ask, 'ask'); return }
   if (e.key === ' ' && e.target.dataset && e.target.dataset.pick) { e.preventDefault(); e.target.click(); return }
   var f = byId(S.sel[S.tab])
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && f && groupOf(f) !== 'closed') {

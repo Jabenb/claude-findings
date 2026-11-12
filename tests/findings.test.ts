@@ -69,7 +69,7 @@ const FIX = {
   gaps: ['дубли, созданные до фикса'],
 }
 
-type Press = { type: string; id?: string; ids?: string[]; note?: string; isDeep?: boolean; version?: number; fix?: number; lang?: string }
+type Press = { type: string; id?: string; ids?: string[]; note?: string; at?: number; version?: number; fix?: number; lang?: string }
 
 type World = {
   files: Map<string, string>
@@ -83,6 +83,7 @@ type World = {
   badges: number[]
   presses: Press[][]
   forkReply: { isAnswered: true; text: string } | { isAnswered: false; reason: string }
+  isDropping: boolean
 }
 
 /** The engine and the hub beneath the mod, held in memory: files, git, session, model, prompt, and the hub's page, push and pull. */
@@ -99,6 +100,7 @@ const world = (on: On, files: Record<string, string> = {}): World => {
     badges: [],
     presses: [],
     forkReply: { isAnswered: false, reason: 'nothing-to-fork' },
+    isDropping: false,
   }
   const usage = { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
 
@@ -168,6 +170,10 @@ const world = (on: On, files: Record<string, string> = {}): World => {
     return { value: undefined }
   })
   on('prompt.submit', (_, e) => {
+    if (held.isDropping) {
+      return { drop: 'busy' } as never
+    }
+
     held.submitted.push({ text: e.text, ...(e.context === undefined ? {} : { context: e.context }) })
 
     return { text: e.text }
@@ -275,8 +281,9 @@ test('a side answer is read out of the text around its JSON; another example nee
 })
 
 test('a press from the page is read strictly; anything unknown is dropped', async () => {
-  expect(parseAction({ type: 'fix', id: 'R1', note: ' быстро ', version: '2', fix: -1, lang: 'uk' })).toEqual({ type: 'fix', id: 'R1', ids: [], note: 'быстро', isDeep: false, version: 2, fix: 0, lang: 'uk' })
-  expect(parseAction({ type: 'fixMany', ids: ['R1', ' ', 'R3'], isDeep: 'yes' })).toMatchObject({ ids: ['R1', 'R3'], isDeep: false })
+  expect(parseAction({ type: 'fix', id: 'R1', note: ' быстро ', version: '2', fix: -1, lang: 'uk' })).toEqual({ type: 'fix', id: 'R1', ids: [], note: 'быстро', at: 0, version: 2, fix: 0, lang: 'uk' })
+  expect(parseAction({ type: 'fixMany', ids: ['R1', ' ', 'R3'], at: 'yes' })).toMatchObject({ ids: ['R1', 'R3'], at: 0 })
+  expect(parseAction({ type: 'unqueue', id: 'R1', at: 1234 })).toMatchObject({ type: 'unqueue', at: 1234 })
   expect(parseAction({ type: 'rm -rf', id: 'R1' })).toBe(null)
   expect(parseAction({ type: 'defer', id: 'R1', lang: 'de' })?.lang).toBe('en')
 })
@@ -562,51 +569,68 @@ test('news a press of the page sends goes inside that message, and is not added 
   expect(shown(held).news).toEqual([])
 })
 
-test('a question is answered beside the chat by default, and its answer is told to Claude later', async ($, on) => {
-  const { held, press } = await started($, on)
-  held.forkReply = { isAnswered: true, text: 'Потому что `rename` идёт после деплоя.' }
-  await call($, REPORT, { findings: [RENAME] })
-
-  await press({ type: 'ask', note: 'почему окно вообще есть?' })
-
-  expect(held.submitted).toEqual([])
-  expect(held.forked[0]).toContain('The question: почему окно вообще есть?')
-  expect(one(held, 'R1').thread.map(message => [message.by, message.text, message.via])).toEqual([
-    ['you', 'почему окно вообще есть?', 'side'],
-    ['claude', 'Потому что `rename` идёт после деплоя.', 'side'],
-  ])
-  expect(one(held, 'R1').busy).toBe(null)
-  expect(shown(held).news[0]).toMatchObject({ what: 'ask', id: 'R1', note: 'почему окно вообще есть? → Потому что `rename` идёт после деплоя.' })
-})
-
-test('a question with access to the code goes through the session and comes back through reply', async ($, on) => {
+test('a question goes through the session at once, and comes back through reply', async ($, on) => {
   const { held, press } = await started($, on)
   await call($, REPORT, { findings: [RENAME] })
 
-  await press({ type: 'ask', note: 'а где ещё читают property?', isDeep: true })
+  await press({ type: 'ask', note: 'а где ещё читают property?' })
 
   expect(held.forked).toEqual([])
   expect(held.submitted[0]!.text).toBe(
-    'Находка R1 «Окно между деплоем и rename», вопрос: а где ещё читают property?\n\nЕсли нужно, прочитай код и ответь через mcp__findings__reply с id R1; в чат одной строкой.',
+    'Вопросы со страницы «Находки». Если нужно, прочитай код и ответь на каждую находку через mcp__findings__reply с её id; в чат одной строкой.\n\nНаходка R1 «Окно между деплоем и rename» (app/Webhook.php:58):\n- а где ещё читают property?',
   )
-  expect(one(held, 'R1').isAsking).toBe(true)
+  expect(one(held, 'R1')).toMatchObject({ isAsking: true, thread: [{ by: 'you', text: 'а где ещё читают property?', isQueued: false }] })
+  expect(shown(held).events.at(-1)).toMatchObject({ what: 'ask', id: 'R1' })
 
   expect((await call($, 'mcp__findings__reply', { id: 'R9', text: 'x' })).deny).toMatch(/No finding/)
   await call($, 'mcp__findings__reply', { id: 'R1', text: 'В трёх местах: импорт, календарь, вебхук.' })
   expect(one(held, 'R1').isAsking).toBe(false)
-  expect(one(held, 'R1').thread.at(-1)).toMatchObject({ by: 'claude', via: 'session', text: 'В трёх местах: импорт, календарь, вебхук.' })
+  expect(one(held, 'R1').thread.at(-1)).toEqual({ at: NOW + 1000, by: 'claude', text: 'В трёх местах: импорт, календарь, вебхук.', isQueued: false })
 })
 
-test('a side question that gets no answer goes through the session instead', async ($, on) => {
+test('queued questions wait on their cards and go together in one message, with the discussion before them', async ($, on) => {
+  const { held, press } = await started($, on)
+  await call($, REPORT, { findings: [RENAME, REBUILD] })
+  await press({ type: 'ask', note: 'первый?' })
+  await call($, 'mcp__findings__reply', { id: 'R1', text: 'Да.' })
+
+  await press({ type: 'queue', note: 'почему окно?' }, { type: 'queue', note: 'надолго?' }, { type: 'queue', id: 'R2', note: 'сколько раз?' }, { type: 'queue', id: 'R2', note: 'опечатка' })
+  const typo = one(held, 'R2').thread.at(-1)!.at
+  await press({ type: 'unqueue', id: 'R2', at: typo }, { type: 'queue', id: 'R2', note: '' })
+
+  expect(held.submitted).toHaveLength(1)
+  expect(one(held, 'R1').thread.filter(message => message.isQueued).map(message => message.text)).toEqual(['почему окно?', 'надолго?'])
+  expect(one(held, 'R2').thread.map(message => message.text)).toEqual(['сколько раз?'])
+
+  await press({ type: 'askAll', id: '' })
+
+  expect(held.submitted).toHaveLength(2)
+  expect(held.submitted[1]!.text).toBe(
+    [
+      'Вопросы со страницы «Находки». Если нужно, прочитай код и ответь на каждую находку через mcp__findings__reply с её id; в чат одной строкой.',
+      'Находка R1 «Окно между деплоем и rename» (app/Webhook.php:58):\n- почему окно?\n- надолго?',
+      'Обсуждение до этого:\nUser: первый?\nClaude: Да.',
+      'Находка R2 «Двойная пересборка юнитов» (app/PropertyAdapter.php:12):\n- сколько раз?',
+    ].join('\n\n'),
+  )
+  expect(shown(held).findings.map(found => [found.id, found.isAsking, found.thread.some(message => message.isQueued)])).toEqual([
+    ['R1', true, false],
+    ['R2', true, false],
+  ])
+
+  await press({ type: 'askAll', id: '' })
+  expect(held.submitted).toHaveLength(2)
+})
+
+test('a question that could not be sent stays queued on its card', async ($, on) => {
   const { held, press } = await started($, on)
   await call($, REPORT, { findings: [RENAME] })
+  held.isDropping = true
 
   await press({ type: 'ask', note: 'что сломается первым?' })
 
-  expect(held.forked).toHaveLength(1)
-  expect(held.submitted[0]!.text).toMatch(/^Находка R1 «Окно между деплоем и rename», вопрос: что сломается первым\?/)
-  expect(one(held, 'R1')).toMatchObject({ busy: null, isAsking: true })
-  expect(held.toasts.at(-1)).toBe('Находки: быстрый ответ не получился, запрос ушёл в чат')
+  expect(one(held, 'R1')).toMatchObject({ isAsking: false, thread: [{ text: 'что сломается первым?', isQueued: true }] })
+  expect(held.toasts.at(-1)).toBe('Находки: запрос не ушёл в чат, нажми ещё раз')
 })
 
 test('solutions for several findings are asked in one message, approved one by one and applied together', async ($, on) => {

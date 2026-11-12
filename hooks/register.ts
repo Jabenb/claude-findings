@@ -5,8 +5,6 @@ import {
   applyAsk,
   applyChange,
   applyManyAsk,
-  askPrompt,
-  askViaSession,
   carriedFor,
   contextNote,
   DAY,
@@ -37,6 +35,7 @@ import {
   parseReport,
   parseState,
   projectSlug,
+  questionsAsk,
   PROPOSE_FIX,
   REPLY,
   REPLY_DESCRIPTION,
@@ -62,7 +61,6 @@ const ICON = '🔎'
 const COMMAND = 'findings'
 const PULL_WAIT_MS = 5000
 const PULL_STUCK_MS = PULL_WAIT_MS + 10_000
-const ANSWER_IN_NEWS = 300
 /** How long after the last waiting finding is closed or set aside the page's news goes to Claude by itself: time enough for Undo. */
 const AUTO_TELL_MS = 6000
 
@@ -335,59 +333,21 @@ const explain = async ($: EngineInterface, finding: Finding, action: PageAction,
   }
 }
 
-/** Puts a question through the session: Claude may read the code and answers with the reply tool. */
-const askDeep = async ($: EngineInterface, finding: Finding, question: string, fix: Fix | null): Promise<boolean> => {
-  await dispatch($, { op: 'asking', id: finding.id, isAsking: true })
+/** A question typed on a card waits there until it is sent with the others; its time is its key on the card, so no two share one. */
+const queueQuestion = ($: EngineInterface, finding: Finding, question: string, at: number): Promise<State> =>
+  dispatch($, { op: 'queue', id: finding.id, message: { at: Math.max(at, (finding.thread.at(-1)?.at ?? 0) + 1), by: 'you', text: question, isQueued: true } })
 
-  if (await deliver($, note => askViaSession(finding, question, fix, lang, note))) {
-    return true
-  }
+/** The queued questions of the findings named (all of them when none are), in one message through the session; Claude answers each through reply. */
+const sendQuestions = async ($: EngineInterface, ids: readonly string[], at: number): Promise<void> => {
+  const asked = current.findings.filter(finding => (ids.length === 0 || ids.includes(finding.id)) && !finding.isAsking && finding.thread.some(message => message.isQueued))
 
-  await dispatch($, { op: 'asking', id: finding.id, isAsking: false })
-
-  return false
-}
-
-/** A question on the card: beside the chat by default, through the session when asked so, for a carried finding, or when the side answer fails. */
-const ask = async ($: EngineInterface, finding: Finding, action: PageAction, at: number): Promise<void> => {
-  const question = action.note
-
-  if (question === '' || finding.busy !== null || finding.isAsking) {
+  if (asked.length === 0) {
     return
   }
 
-  const fix = finding.status === 'proposed' || finding.status === 'applying' ? fixAt(finding, action.fix) : null
-  const isDeep = action.isDeep || finding.isCarried
-  await dispatch($, { op: 'ask', id: finding.id, message: { at, by: 'you', text: question, via: isDeep ? 'session' : 'side' } })
-
-  if (isDeep) {
-    await askDeep($, finding, question, fix)
-
-    return
-  }
-
-  await dispatch($, { op: 'busy', id: finding.id, busy: 'ask' })
-  let answer = ''
-
-  try {
-    const forked = await $.model.fork({ prompt: askPrompt(finding, question, action.version, fix) })
-    answer = forked.isAnswered ? forked.text.trim() : ''
-  } catch {
-    answer = ''
-  }
-
-  if (answer !== '') {
-    const now = await $.clock.now()
-    await dispatch($, { op: 'answer', id: finding.id, message: { at: now, by: 'claude', text: answer, via: 'side' } })
-    await tell($, finding, 'ask', `${question} → ${answer.length > ANSWER_IN_NEWS ? `${answer.slice(0, ANSWER_IN_NEWS - 1)}…` : answer}`, now)
-
-    return
-  }
-
-  await dispatch($, { op: 'busy', id: finding.id, busy: null })
-
-  if (await askDeep($, finding, question, fix)) {
-    $.ui.toast(words(lang).viaChat, { timeoutMs: 5000 })
+  if (await deliver($, note => questionsAsk(asked, lang, note))) {
+    await dispatch($, { op: 'sending', ids: asked.map(finding => finding.id) })
+    await dispatch($, { op: 'sent', event: { at, what: 'ask', id: asked.map(finding => finding.id).join(', '), note: '' } })
   }
 }
 
@@ -510,7 +470,7 @@ const autoTell = async ($: EngineInterface): Promise<void> => {
 }
 
 /** Presses that reach Claude as a message, or change what Claude is told: listed on the page under "Sent to Claude". */
-const SENT: readonly PageAction['type'][] = ['simpler', 'example', 'fix', 'another', 'apply', 'discuss', 'defer', 'dismiss', 'restore', 'ask', 'cancel']
+const SENT: readonly PageAction['type'][] = ['simpler', 'example', 'fix', 'another', 'apply', 'discuss', 'defer', 'dismiss', 'restore', 'cancel']
 
 /** One press on the page. */
 const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
@@ -554,6 +514,8 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
       await dispatch($, { op: 'sent', event: { at, what: 'apply', id: action.ids.join(', '), note: action.note } })
 
       return applyMany($, action, at)
+    case 'askAll':
+      return sendQuestions($, [], at)
   }
 
   const finding = findingOf(action.id)
@@ -573,8 +535,22 @@ const handle = async ($: EngineInterface, raw: unknown): Promise<void> => {
     case 'simpler':
     case 'example':
       return explain($, finding, action, entry)
+    case 'queue':
+      if (action.note !== '') {
+        await queueQuestion($, finding, action.note, at)
+      }
+
+      return
+    case 'unqueue':
+      await dispatch($, { op: 'unqueue', id: finding.id, at: action.at })
+
+      return
     case 'ask':
-      return ask($, finding, action, at)
+      if (action.note !== '' && !finding.isAsking) {
+        await queueQuestion($, finding, action.note, at)
+      }
+
+      return sendQuestions($, [finding.id], at)
     case 'fix':
     case 'another':
       return askFix($, finding, action, entry)
@@ -772,7 +748,7 @@ export const register: Register = on => {
       return { deny: 'text is empty: give the answer.' }
     }
 
-    await dispatch($, { op: 'answer', id, message: { at: await $.clock.now(), by: 'claude', text: answer, via: 'session' } })
+    await dispatch($, { op: 'answer', id, message: { at: await $.clock.now(), by: 'claude', text: answer, isQueued: false } })
 
     return { result: `The answer is shown under ${id} on the Findings page. In chat, one short line.` }
   })

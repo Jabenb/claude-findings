@@ -69,8 +69,6 @@ export type Finding = {
   isAsking: boolean
   /** The solution the person approved for a batch apply (its index), or null. */
   approved: number | null
-  /** Reported by another session of the same branch: this session's model has not read its code. */
-  isCarried: boolean
   /** How the applied solution was checked, as Claude said it when marking the finding fixed. */
   check: string
   log: Entry[]
@@ -86,14 +84,9 @@ export type News = { at: number; what: Moment; id: string; title: string; note: 
 /** What the page draws; the same value is this session's file. */
 /**
  * `isStandingTold`: Claude was told which findings stand closed as "not a problem" or set aside, and the transcript still holds it.
- * Cleared by a compaction and by findings carried in from another session.
+ * Cleared by a compaction.
  */
 export type State = { findings: Finding[]; branch: string; events: Sent[]; news: News[]; updatedAt: number; isStandingTold: boolean }
-
-/** A finding still waiting on the person, as the project's file keeps it for the branch's other sessions. */
-export type Standing = { branch: string; sessionId: string; updatedAt: number; finding: Finding }
-
-export type ProjectFile = { lastNo: number; standing: Standing[] }
 
 /** What the page passes to `hub.send`. */
 export type PageAction = {

@@ -1,26 +1,21 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import type { Finding, ProjectFile, State } from '../types'
+import type { Finding, State } from '../types'
 import {
   applyChange,
-  carriedFor,
   DAY,
   EMPTY,
   contextNote,
-  fixAsk,
   locateHunks,
   normalizeDiff,
   parseAction,
   parseExplanation,
   parseFix,
-  parseProject,
   parseReport,
   parseState,
   questionsAsk,
   stepsAt,
-  sweepProject,
-  syncProject,
 } from '../hooks/model'
 import { PAGE, SHIKI_VERSION } from '../hooks/page/page'
 
@@ -85,6 +80,9 @@ type World = {
   presses: Press[][]
   forkReply: { isAnswered: true; text: string } | { isAnswered: false; reason: string }
   isDropping: boolean
+  /** When the last daily sweep ran, and the chats Claude Code still keeps. */
+  lastSweep: number
+  chats: string[]
 }
 
 /** The engine and the hub beneath the mod, held in memory: files, git, session, model, prompt, and the hub's page, push and pull. */
@@ -102,6 +100,8 @@ const world = (on: On, files: Record<string, string> = {}): World => {
     presses: [],
     forkReply: { isAnswered: false, reason: 'nothing-to-fork' },
     isDropping: false,
+    lastSweep: NOW,
+    chats: [],
   }
   const usage = { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
 
@@ -142,6 +142,17 @@ const world = (on: On, files: Record<string, string> = {}): World => {
       return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
     }
 
+    if (e.argv[0] === 'rm') {
+      const gone = e.argv.slice(2)
+      ;[...held.files.keys()].filter(path => gone.some(one => path === one || path.startsWith(`${one}/`))).forEach(path => held.files.delete(path))
+
+      return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+    }
+
+    if (e.argv[0] === 'find') {
+      return { value: { exitCode: 0, stdout: held.chats.map(id => `${HOME}/.claude/projects/-w-shop/${id}.jsonl\n`).join(''), stderr: '' } } as never
+    }
+
     return { value: { exitCode: 0, stdout: e.argv.includes('rev-parse') ? `${BRANCH}\n` : `${BRANCH}\nmain\n`, stderr: '' } } as never
   })
   on('fs.exists', (_, e) => ({ value: held.files.has(e.path) }))
@@ -157,8 +168,10 @@ const world = (on: On, files: Record<string, string> = {}): World => {
 
     return { value: undefined }
   })
-  on('fs.list', () => ({ value: [] }))
-  on('store.get', (_, e) => ({ value: e.key === 'lang' ? 'ru' : NOW }))
+  on('fs.list', (_, e) => ({
+    value: [...held.files.keys()].filter(path => path.startsWith(`${e.path}/`)).map(path => ({ name: path.slice(e.path.length + 1), kind: 'file', mtimeMs: 0 })),
+  }) as never)
+  on('store.get', (_, e) => ({ value: e.key === 'lang' ? 'ru' : held.lastSweep }))
   on('store.set', () => ({ value: undefined }))
   on('ui.toast', (_, e) => {
     held.toasts.push(e.text)
@@ -202,8 +215,6 @@ const shown = (held: World): State => held.pushed.at(-1) ?? EMPTY
 
 const one = (held: World, id: string): Finding => shown(held).findings.find(finding => finding.id === id)!
 
-const project = (held: World): ProjectFile => parseProject(held.files.get(PROJECT) ?? '')
-
 const finding = (id: string, patch: Partial<Finding> = {}): Finding => ({
   id,
   title: `Находка ${id}`,
@@ -216,7 +227,6 @@ const finding = (id: string, patch: Partial<Finding> = {}): Finding => ({
   busy: null,
   isAsking: false,
   approved: null,
-  isCarried: false,
   check: '',
   log: [],
   thread: [],
@@ -298,13 +308,12 @@ test('cancel puts a request in flight back, and drops a solution on the card', a
   expect(after.findings.map(one => [one.id, one.status, one.fixes.length])).toEqual([['R1', 'open', 0], ['R2', 'proposed', 1], ['R3', 'proposed', 1], ['R4', 'open', 0]])
 })
 
-test('the standing lists are told once; a compaction or a finding carried in from another session makes them go again', async () => {
+test('the standing lists are told once; a compaction makes them go again', async () => {
   const told = applyChange({ ...EMPTY, findings: [finding('R1', { status: 'dismissed' })] }, { op: 'told' })
 
   expect(told.isStandingTold).toBe(true)
   expect(contextNote(told, 'ru')).toBe('')
-  expect(applyChange(told, { op: 'carry', findings: [], branch: 'b' }).isStandingTold).toBe(true)
-  expect(applyChange(told, { op: 'carry', findings: [finding('R5', { status: 'deferred', isCarried: true })], branch: 'b' }).isStandingTold).toBe(false)
+  expect(applyChange(told, { op: 'branch', branch: 'b' }).isStandingTold).toBe(true)
   expect(contextNote(applyChange(told, { op: 'compacted' }), 'ru')).toBe('Пользователь закрыл как «не проблема», не поднимай их как проблему снова: R1.')
   expect(parseState(JSON.stringify(told))!.isStandingTold).toBe(true)
 })
@@ -323,16 +332,18 @@ test('a file written by the pane version of the mod is read into the new shape',
   expect(state.events).toEqual([])
 })
 
-test("the project's file keeps waiting findings per branch and forgets closed ones and dead branches", async () => {
-  const state = { ...EMPTY, branch: BRANCH, findings: [finding('R1', { status: 'fixing' }), finding('R2', { status: 'deferred' }), finding('R3', { status: 'fixed' })] }
-  const file = syncProject({ lastNo: 1, standing: [{ branch: BRANCH, sessionId: OTHER, updatedAt: 5, finding: finding('R3') }] }, state, OWN, 50)
+test('the daily sweep drops the files of sessions whose chat is gone and the project file of older versions', async ($, on) => {
+  const kept = `${DATA}/sessions/${OTHER}.json`
+  const gone = `${DATA}/sessions/cccccccc-1111-2222-3333-444444444444.json`
+  const held = world(on, { [PROJECT]: '{"lastNo":6,"standing":[]}', [kept]: '{}', [gone]: '{}' })
+  held.lastSweep = 0
+  held.chats = [OWN, OTHER]
+  mock.clock(on, { now: NOW })
+  await $.session.start(START)
 
-  expect(file.lastNo).toBe(3)
-  expect(file.standing.map(entry => [entry.finding.id, entry.finding.status, entry.sessionId])).toEqual([['R1', 'open', OWN], ['R2', 'deferred', OWN]])
-  expect(carriedFor(file, BRANCH, OTHER, []).map(carried => [carried.id, carried.isCarried])).toEqual([['R1', true], ['R2', true]])
-  expect(carriedFor(file, 'main', OTHER, [])).toEqual([])
-  expect(sweepProject(file, ['main'], 50 + 31 * DAY).standing).toEqual([])
-  expect(sweepProject(file, ['main'], 50 + 29 * DAY).standing).toHaveLength(2)
+  expect(held.files.has(PROJECT)).toBe(false)
+  expect(held.files.has(kept)).toBe(true)
+  expect(held.files.has(gone)).toBe(false)
 })
 
 test('the page carries Islands Dark and a pinned Shiki, and has no template holes left', async () => {
@@ -356,7 +367,7 @@ test('the page is put in the hub at the start, and reported findings reach it wi
   expect(held.statuses.at(-1)).toBe('Находки: 2')
   expect(held.toasts.at(-1)).toBe('Находки: новых — 2. http://localhost:7777/#/s/findings')
   expect(parseState(held.files.get(SESSION_FILE) ?? '')?.findings).toHaveLength(2)
-  expect(project(held).standing.map(entry => [entry.finding.id, entry.branch])).toEqual([['R1', BRANCH], ['R2', BRANCH]])
+  expect(held.files.has(PROJECT)).toBe(false)
 })
 
 test('a refused report shows nothing and says what to fix', async ($, on) => {
@@ -400,7 +411,7 @@ test('when the side answer fails the ask goes to chat and comes back through the
   expect(one(held, 'R1').versions.at(-1)?.plain).toBe('Другой случай.')
 })
 
-test('a deferred finding leaves the badge, stays for the branch and rides on the next prompt', async ($, on) => {
+test('a deferred finding leaves the badge, stays in the session and rides on the next prompt', async ($, on) => {
   const { held, press } = await started($, on)
   await call($, REPORT, { findings: [RENAME, REBUILD] })
 
@@ -409,7 +420,7 @@ test('a deferred finding leaves the badge, stays for the branch and rides on the
   expect(one(held, 'R1').status).toBe('deferred')
   expect(held.badges.at(-1)).toBe(1)
   expect(held.statuses.at(-1)).toBe('Находки: 1')
-  expect(project(held).standing.map(entry => [entry.finding.id, entry.finding.status])).toEqual([['R1', 'deferred'], ['R2', 'open']])
+  expect(parseState(held.files.get(SESSION_FILE) ?? '')?.findings.map(found => [found.id, found.status])).toEqual([['R1', 'deferred'], ['R2', 'open']])
 
   await $.prompt.submit({ text: 'почини всё', wait: false, origin: { kind: 'composer' } })
   expect(held.submitted.at(-1)).toEqual({
@@ -450,12 +461,10 @@ test('"fix" asks for a solution first, shows it on the card, and edits only afte
   expect(held.submitted[1]!.text).toBe(
     `Находка R1 «Окно между деплоем и rename»: применяй решение «Искать под обоими именами». Когда закончишь и проверишь, вызови ${MARK_FIXED} с id R1 и напиши в check, чем проверил.`,
   )
-  expect(project(held).standing.map(entry => entry.finding.status)).toEqual(['proposed'])
 
   expect((await call($, MARK_FIXED, { id: 'R1' })).deny).toMatch(/check is empty/)
   await call($, MARK_FIXED, { id: 'R1', check: 'WebhookTest: 12 из 12' })
   expect(one(held, 'R1')).toMatchObject({ status: 'fixed', check: 'WebhookTest: 12 из 12' })
-  expect(project(held).standing).toEqual([])
   expect(held.statuses.at(-1)).toBe(undefined)
 })
 
@@ -486,44 +495,25 @@ test('"clear closed" can be undone from the page', async ($, on) => {
   expect(shown(held).findings.map(found => [found.id, found.status])).toEqual([['R2', 'open'], ['R1', 'dismissed']])
 })
 
-test('a fix asked for a finding of another session carries the finding itself', async () => {
-  const carried = finding('R5', { title: 'Сбой отеля', isCarried: true })
+test("each session numbers its findings from R1 and does not show another session's, even with an older version's project file", async ($, on) => {
+  const left = { lastNo: 6, standing: [{ branch: BRANCH, sessionId: OTHER, updatedAt: 99 * DAY, finding: finding('R5', { status: 'deferred' }) }] }
+  const { held } = await started($, on, { [PROJECT]: JSON.stringify(left) })
 
-  const note = contextNote({ ...EMPTY, findings: [carried, finding('R2', { status: 'deferred' })] }, 'ru')
+  expect(shown(held).findings).toEqual([])
 
-  expect(fixAsk(carried, '', 'ru', note)).toContain('Это находка из прошлой сессии на этой ветке, ты её ещё не видел. Вот она целиком:\nR5 [high] Сбой отеля')
-  expect(fixAsk(carried, '', 'ru', note)).toMatch(/Отложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: R2\.$/)
+  const reported = await call($, REPORT, { findings: [RENAME] })
+  expect(String(reported.result)).toMatch(/ids R1\)/)
 })
 
-test('only a finding of another session brings its discussion along with the queued questions', async () => {
+test('the queued questions go without the discussion the session already has', async () => {
   const thread = [
     { at: 1, by: 'you' as const, text: 'первый?', isQueued: false },
     { at: 2, by: 'claude' as const, text: 'Да.', isQueued: false },
     { at: 3, by: 'you' as const, text: 'а второй?', isQueued: true },
   ]
 
+  expect(questionsAsk([finding('R1', { thread })], 'ru')).toContain('- а второй?')
   expect(questionsAsk([finding('R1', { thread })], 'ru')).not.toContain('первый?')
-  expect(questionsAsk([finding('R5', { thread, isCarried: true })], 'ru')).toContain('- а второй?\n\nОбсуждение до этого:\nUser: первый?\nClaude: Да.\n\nЭто находка из прошлой сессии')
-})
-
-test('a new session of the branch shows what the last one left, and asks about it through chat', async ($, on) => {
-  const left: ProjectFile = {
-    lastNo: 6,
-    standing: [
-      { branch: BRANCH, sessionId: OTHER, updatedAt: 99 * DAY, finding: finding('R5', { title: 'Сбой отеля блокирует номера', status: 'deferred' }) },
-      { branch: 'main', sessionId: OTHER, updatedAt: 99 * DAY, finding: finding('R6') },
-    ],
-  }
-  const { held, press } = await started($, on, { [PROJECT]: JSON.stringify(left) })
-
-  expect(shown(held).findings.map(found => [found.id, found.isCarried])).toEqual([['R5', true]])
-
-  await press({ type: 'simpler', id: 'R5' })
-  expect(held.forked).toEqual([])
-  expect(held.submitted[0]!.text).toContain('Это находка из прошлой сессии на этой ветке, ты её ещё не видел. Вот она целиком:\nR5 [high] Сбой отеля блокирует номера')
-
-  const reported = await call($, REPORT, { findings: [RENAME] })
-  expect(String(reported.result)).toMatch(/ids R7\)/)
 })
 
 test('the data of the mod under its old name is copied over once, and its findings come back', async ($, on) => {
@@ -546,7 +536,7 @@ test('a diff is laid over the file: found near its header, without caring for in
   expect(locateHunks(REPO_FILE, "@@ -1,1 +1,1 @@\n-<?php\n+<?php\n@@ -9,1 +9,1 @@\n-            ->first();\n+            ->firstOrFail();")).toEqual([0, 8])
 })
 
-test('a proposed solution carries the file it changes for the whole-file view, but the project file does not', async ($, on) => {
+test('a proposed solution carries the file it changes for the whole-file view', async ($, on) => {
   const { held } = await started($, on, { '/w/shop/app/PmsDataRepository.php': REPO_FILE })
   await call($, REPORT, { findings: [RENAME] })
 
@@ -555,7 +545,6 @@ test('a proposed solution carries the file it changes for the whole-file view, b
   expect(one(held, 'R1').fixes[0]?.changes.map(change => change.full?.starts ?? null)).toEqual([[7], null])
   expect(one(held, 'R1').fixes[0]?.changes[0]?.full?.before).toBe(REPO_FILE)
   expect(String(proposed.result)).toMatch(/The diff of app\/Missing\.php could not be laid over the file on disk/)
-  expect(project(held).standing[0]?.finding.fixes[0]?.changes.map(change => change.full)).toEqual([null, null])
 })
 
 test('"not a problem" reaches Claude once, as news with the note and the standing list, and again only after a compaction', async ($, on) => {

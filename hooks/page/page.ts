@@ -401,7 +401,7 @@ var TEXTS = {
     fixedN: 'исправлено', dismissedN: 'не проблема', copyList: 'Копировать список', copied: 'Скопировано', copyFail: 'Не удалось скопировать', listCopied: 'Список скопирован',
     emptyTitle: { open: 'Всё разобрано', deferred: 'Отложенных нет', closed: 'Закрытых нет', filter: 'Здесь пусто' },
     emptyText: { open: 'Новые находки появятся здесь, когда Claude закончит ревью, аудит или расследование.', deferred: 'Нажми «Отложить» на находке, чтобы вернуться к ней позже. Claude будет о ней помнить.', closed: 'Сюда попадают исправленные находки и те, что отмечены «Не проблема».', filter: 'Нет находок под этот фильтр или поиск.' },
-    hasFix: 'Есть решение', carried: 'Из другой сессии', open: 'Открыть',
+    hasFix: 'Есть решение', open: 'Открыть',
     plain: 'По-простому', how: 'Как это ломается', who: 'Кто и как заметит', solution: 'Решение', history: 'История',
     origin: { first: 'Первое', claude: 'Claude', simpler: 'Проще', example: 'Другой пример' }, byNote: 'По твоему уточнению:',
     breaks: 'Здесь ломается', nowSo: 'Теперь так',
@@ -411,7 +411,6 @@ var TEXTS = {
     change: 'Что изменится', after: 'Тот же пример после исправления', diffs: 'Изменения в коде', gaps: 'Что это решение не закрывает', noGaps: 'Claude не назвал, чего это решение не закрывает.',
     deferredTitle: 'Отложено', deferredText: 'Claude держит её в памяти и не тронет, пока ты её не вернёшь.',
     fixedTitle: 'Исправлено и проверено', dismissedTitle: 'Не проблема', dismissedText: 'Закрыто без исправления',
-    carriedTitle: 'Из другой сессии этой ветки', carriedText: 'Claude в этой сессии ещё не читал этот код: с запросом уйдёт и сама находка.',
     notePh: 'Уточнение к действию (необязательно)…', noteGoes: 'Уйдёт с действием:', escHint: 'выйти из поля',
     act: { fix: 'Чинить', simpler: 'Не понял, проще', example: 'Другой пример', defer: 'Отложить', restoreDeferred: 'Вернуть', dismiss: 'Не проблема', apply: 'Применить', another: 'Другой вариант', discuss: 'Обсудить в чате', cancel: 'Отмена', reopen: 'Вернуть в работу' },
     memory: 'Claude помнит', memoryEmpty: 'Отложенных находок нет. Отложенные появятся здесь, и Claude будет учитывать их в следующих сообщениях.',
@@ -437,7 +436,7 @@ var TEXTS = {
     fixedN: 'fixed', dismissedN: 'not a problem', copyList: 'Copy list', copied: 'Copied', copyFail: 'Could not copy', listCopied: 'List copied',
     emptyTitle: { open: 'All sorted out', deferred: 'Nothing set aside', closed: 'Nothing closed', filter: 'Nothing here' },
     emptyText: { open: 'New findings show up here when Claude finishes a review, an audit or an investigation.', deferred: 'Press "Set aside" on a finding to come back to it later. Claude keeps it in mind.', closed: 'Fixed findings and the ones marked "Not a problem" land here.', filter: 'No findings match this filter or search.' },
-    hasFix: 'Has a solution', carried: 'From another session', open: 'Open',
+    hasFix: 'Has a solution', open: 'Open',
     plain: 'In plain words', how: 'How it breaks', who: 'Who notices, and how', solution: 'Solution', history: 'History',
     origin: { first: 'First', claude: 'Claude', simpler: 'Simpler', example: 'Another example' }, byNote: 'After your note:',
     breaks: 'Breaks here', nowSo: 'Now it goes like this',
@@ -447,7 +446,6 @@ var TEXTS = {
     change: 'What changes', after: 'The same example after the fix', diffs: 'Code changes', gaps: 'What this solution leaves open', noGaps: 'Claude named nothing this solution leaves open.',
     deferredTitle: 'Set aside', deferredText: 'Claude keeps it in mind and will not touch it until you bring it back.',
     fixedTitle: 'Fixed and checked', dismissedTitle: 'Not a problem', dismissedText: 'Closed without a fix',
-    carriedTitle: 'From another session on this branch', carriedText: 'Claude has not read this code in this session: the finding itself goes along with the request.',
     notePh: 'A note for the action (optional)…', noteGoes: 'Goes with the action:', escHint: 'leave the field',
     act: { fix: 'Fix', simpler: 'Simpler, please', example: 'Another example', defer: 'Set aside', restoreDeferred: 'Bring back', dismiss: 'Not a problem', apply: 'Apply', another: 'Another option', discuss: 'Discuss in chat', cancel: 'Cancel', reopen: 'Reopen' },
     memory: 'Claude remembers', memoryEmpty: 'Nothing set aside. Findings you set aside show up here, and Claude keeps them in mind in your next messages.',
@@ -473,7 +471,7 @@ var TEXTS = {
     fixedN: 'виправлено', dismissedN: 'не проблема', copyList: 'Копіювати список', copied: 'Скопійовано', copyFail: 'Не вдалося скопіювати', listCopied: 'Список скопійовано',
     emptyTitle: { open: 'Усе розібрано', deferred: 'Відкладених немає', closed: 'Закритих немає', filter: 'Тут порожньо' },
     emptyText: { open: 'Нові знахідки зʼявляться тут, коли Claude закінчить рев’ю, аудит чи розслідування.', deferred: 'Натисни «Відкласти» на знахідці, щоб повернутися до неї пізніше. Claude памʼятатиме про неї.', closed: 'Сюди потрапляють виправлені знахідки й ті, що позначені «Не проблема».', filter: 'Немає знахідок під цей фільтр чи пошук.' },
-    hasFix: 'Є рішення', carried: 'З іншої сесії', open: 'Відкрити',
+    hasFix: 'Є рішення', open: 'Відкрити',
     plain: 'Простими словами', how: 'Як це ламається', who: 'Хто і як помітить', solution: 'Рішення', history: 'Історія',
     origin: { first: 'Перше', claude: 'Claude', simpler: 'Простіше', example: 'Інший приклад' }, byNote: 'За твоїм уточненням:',
     breaks: 'Тут ламається', nowSo: 'Тепер так',
@@ -483,7 +481,6 @@ var TEXTS = {
     change: 'Що зміниться', after: 'Той самий приклад після виправлення', diffs: 'Зміни в коді', gaps: 'Чого це рішення не закриває', noGaps: 'Claude не назвав, чого це рішення не закриває.',
     deferredTitle: 'Відкладено', deferredText: 'Claude тримає її в памʼяті й не чіпатиме, доки ти її не повернеш.',
     fixedTitle: 'Виправлено й перевірено', dismissedTitle: 'Не проблема', dismissedText: 'Закрито без виправлення',
-    carriedTitle: 'З іншої сесії цієї гілки', carriedText: 'Claude у цій сесії ще не читав цей код: разом із запитом піде й сама знахідка.',
     notePh: 'Уточнення до дії (необовʼязково)…', noteGoes: 'Піде з дією:', escHint: 'вийти з поля',
     act: { fix: 'Лагодити', simpler: 'Не зрозумів, простіше', example: 'Інший приклад', defer: 'Відкласти', restoreDeferred: 'Повернути', dismiss: 'Не проблема', apply: 'Застосувати', another: 'Інший варіант', discuss: 'Обговорити в чаті', cancel: 'Скасувати', reopen: 'Повернути в роботу' },
     memory: 'Claude памʼятає', memoryEmpty: 'Відкладених знахідок немає. Відкладені зʼявляться тут, і Claude враховуватиме їх у наступних повідомленнях.',
@@ -893,8 +890,7 @@ function rowHTML(f) {
   var t = T(), closed = groupOf(f) === 'closed'
   var lead = closed ? '<span class="ok">' + (f.status === 'fixed' ? icon('check', 12) : icon('x', 11)) + '</span>' : '<span class="g g-' + f.severity + '" title="' + esc(t.sev[f.severity]) + '">' + SEVG[f.severity] + '</span>'
   var tag = !closed && f.status === 'proposed' && f.approved !== null ? '<span class="chip" style="color:var(--ok);background:var(--ok-soft)">' + icon('check', 11) + esc(t.approvedChip) + '</span>'
-    : !closed && f.status === 'proposed' ? '<span class="chip" style="color:var(--claude);background:var(--claude-soft)">' + esc(t.hasFix) + '</span>'
-    : f.isCarried ? '<span class="chip" style="color:var(--sugg);background:var(--sugg-soft)">' + esc(t.carried) + '</span>' : ''
+    : !closed && f.status === 'proposed' ? '<span class="chip" style="color:var(--claude);background:var(--claude-soft)">' + esc(t.hasFix) + '</span>' : ''
   return '<div class="rowwrap" data-key="row-' + f.id + '">' + pickBox(f) + '<button class="row' + (closed ? ' closed' : '') + '" type="button" data-sel="' + f.id + '" aria-label="' + esc(t.open + ' ' + f.id) + '">' + lead + '<span class="id">' + f.id + '</span><span class="tt">' + esc(f.title) + '</span>' + tag + '<span class="lc">' + esc(f.where) + '</span><span style="color:var(--faint);display:flex">' + I.chev + '</span></button></div>'
 }
 
@@ -951,7 +947,6 @@ function cardHTML(f) {
   var t = T(), v = viewOf(f), ver = f.versions[v.vi], g = groupOf(f)
   var h = '<article class="card' + (g === 'closed' ? ' closed' : '') + '" data-key="card-' + f.id + '"><div class="cbody">'
   h += '<div class="chead"><div class="r">' + pickBox(f) + '<span class="idtag">' + f.id + '</span>' + sevChip(f.severity) + '<span class="sp"></span><button class="loc" type="button" data-copy="' + esc(f.where) + '" title="' + esc(t.copyPath) + '">' + esc(f.where) + I.copy + '</button></div><h3>' + esc(f.title) + '</h3></div>'
-  if (f.isCarried) h += '<div class="banner info"><span class="ic">' + icon('link') + '</span><div><b>' + esc(t.carriedTitle) + '</b>' + esc(t.carriedText) + '</div></div>'
   if (f.status === 'deferred') h += '<div class="banner wait"><span class="ic">' + icon('clock') + '</span><div><b>' + esc(t.deferredTitle) + '</b>' + esc(t.deferredText) + '</div></div>'
   if (f.status === 'fixed') h += '<div class="banner ok"><span class="ic">' + icon('check') + '</span><div><b>' + esc(t.fixedTitle) + '</b>' + vals(f.check) + '</div></div>'
   if (f.status === 'dismissed') h += '<div class="banner neutral"><span class="ic">' + icon('x') + '</span><div><b>' + esc(t.dismissedTitle) + '</b>' + esc(t.dismissedText) + '</div></div>'

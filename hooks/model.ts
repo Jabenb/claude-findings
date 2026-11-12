@@ -10,10 +10,8 @@ import type {
   Moment,
   News,
   PageAction,
-  ProjectFile,
   Sent,
   Severity,
-  Standing,
   State,
   Status,
   Step,
@@ -38,7 +36,6 @@ const EVENTS_KEPT = 10
 export const FULL_FILE_LIMIT = 400_000
 
 export const EMPTY: State = { findings: [], branch: '', events: [], news: [], updatedAt: 0, isStandingTold: false }
-export const EMPTY_PROJECT: ProjectFile = { lastNo: 0, standing: [] }
 
 export const GUIDE = [
   '# Findings page',
@@ -253,7 +250,6 @@ const fresh = (id: string, title: string, severity: Severity, where: string, not
   busy: null,
   isAsking: false,
   approved: null,
-  isCarried: false,
   check: '',
   log: [],
   thread: [],
@@ -520,7 +516,7 @@ export const parseAction = (raw: unknown): PageAction | null => {
 
 export type Change =
   | { op: 'report'; added: Finding[]; versions: { id: string; explanation: Explanation }[]; at: number }
-  | { op: 'carry'; findings: Finding[]; branch: string }
+  | { op: 'branch'; branch: string }
   | { op: 'busy'; id: string; busy: Finding['busy']; entry?: Entry }
   | { op: 'version'; id: string; explanation: Explanation; at: number }
   | { op: 'status'; id: string; status: Status; entry?: Entry; check?: string }
@@ -578,11 +574,8 @@ export const applyChange = (state: State, change: Change): State => {
 
       return { ...explained, findings: [...explained.findings, ...added], updatedAt: change.at }
     }
-    case 'carry': {
-      const known = change.findings.filter(finding => !state.findings.some(one => one.id === finding.id))
-
-      return { ...state, branch: change.branch, findings: [...state.findings, ...known], isStandingTold: state.isStandingTold && known.length === 0 }
-    }
+    case 'branch':
+      return { ...state, branch: change.branch }
     case 'busy':
       return edit(state, change.id, finding => logged({ ...finding, busy: change.busy }, change.entry))
     case 'version':
@@ -697,7 +690,6 @@ export const parseFinding = (raw: unknown): Finding | null => {
         busy: null,
         isAsking: one.isAsking === true,
         approved,
-        isCarried: one.isCarried === true,
         check: text(one.check),
         log: parseLog(one.log),
         thread: parseThread(one.thread),
@@ -739,79 +731,6 @@ export const parseState = (body: string): State | null => {
   }
 }
 
-export const parseProject = (body: string): ProjectFile => {
-  try {
-    const raw = record(JSON.parse(body))
-
-    return Array.isArray(raw.standing)
-      ? {
-          lastNo: Number(raw.lastNo) || 0,
-          standing: raw.standing.flatMap(value => {
-            const one = record(value)
-            const finding = parseFinding(one.finding)
-
-            return finding === null ? [] : [{ branch: text(one.branch), sessionId: text(one.sessionId), updatedAt: Number(one.updatedAt) || 0, finding }]
-          }),
-        }
-      : EMPTY_PROJECT
-  } catch {
-    return EMPTY_PROJECT
-  }
-}
-
-export const projectSlug = (root: string): string => root.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'root'
-
-/** What another session should meet: nothing mid-flight, since the turn that was working on it is not theirs, and no file copies. */
-const settled = (finding: Finding): Finding => ({
-  ...finding,
-  busy: null,
-  isAsking: false,
-  isCarried: false,
-  status: finding.status === 'fixing' ? (finding.fixes.length > 0 ? 'proposed' : 'open') : finding.status === 'applying' ? 'proposed' : finding.status,
-  fixes: finding.fixes.map(fix => ({ ...fix, changes: fix.changes.map(change => ({ ...change, full: null })) })),
-})
-
-/** The project's file after this session's state: its waiting findings written, its closed ones gone. */
-export const syncProject = (file: ProjectFile, state: State, sessionId: string, now: number): ProjectFile => {
-  const mine = new Map(state.findings.map(finding => [finding.id, finding]))
-  const kept: Standing[] = file.standing.flatMap(entry => {
-    const finding = mine.get(entry.finding.id)
-
-    if (finding === undefined) {
-      return [entry]
-    }
-
-    mine.delete(entry.finding.id)
-
-    if (isClosed(finding.status)) {
-      return []
-    }
-
-    const next = settled(finding)
-
-    return [JSON.stringify(next) === JSON.stringify(entry.finding) ? entry : { ...entry, updatedAt: now, finding: next }]
-  })
-  const added: Standing[] = [...mine.values()]
-    .filter(finding => !isClosed(finding.status))
-    .map(finding => ({ branch: state.branch, sessionId, updatedAt: now, finding: settled(finding) }))
-
-  return { lastNo: Math.max(file.lastNo, lastNumber(state.findings)), standing: [...kept, ...added] }
-}
-
-/** The branch's waiting findings this session does not show yet. */
-export const carriedFor = (file: ProjectFile, branch: string, sessionId: string, known: readonly Finding[]): Finding[] =>
-  branch === ''
-    ? []
-    : file.standing
-        .filter(entry => entry.branch === branch && !known.some(finding => finding.id === entry.finding.id))
-        .map(entry => ({ ...entry.finding, isCarried: entry.sessionId !== sessionId }))
-
-/** Drops the findings of branches that are gone locally, once nobody touched them for 30 days. */
-export const sweepProject = (file: ProjectFile, branches: readonly string[], now: number): ProjectFile => ({
-  ...file,
-  standing: file.standing.filter(entry => branches.includes(entry.branch) || now - entry.updatedAt <= 30 * DAY),
-})
-
 export const explanationAt = (finding: Finding, index: number): Explanation =>
   finding.versions[Math.max(0, Math.min(index, finding.versions.length - 1))] ?? { plain: '', steps: [], origin: 'claude', note: '' }
 
@@ -841,7 +760,6 @@ type Words = {
   lost: string
   unclear: string
   viaReport: (id: string) => string
-  carried: string
   propose: string
   proposeOther: (tried: string) => string
   noEdit: string
@@ -851,9 +769,7 @@ type Words = {
   applyMany: string
   applyManyTail: string
   solution: string
-  leaves: string
   questions: string
-  discussion: string
   tell: string
   newsHead: string
   newsWhat: Partial<Record<Moment, string>>
@@ -881,7 +797,6 @@ const WORDS: Record<Lang, Words> = {
     lost: 'I did not understand the explanation.',
     unclear: 'What exactly is unclear:',
     viaReport: id => `Answer through ${REPORT} with id ${id} (plain, and steps if the example changes), one line in chat.`,
-    carried: 'This finding comes from an earlier session on this branch, you have not seen it yet. Here it is in full:',
     propose: 'propose a solution.',
     proposeOther: tried => `propose a different solution, not like ${tried}.`,
     noEdit: `Do not change the code yet. Call ${PROPOSE_FIX}: what will change in plain words, the same live example after the fix, the diff per file and what the solution leaves open.`,
@@ -891,9 +806,7 @@ const WORDS: Record<Lang, Words> = {
     applyMany: 'Apply the solutions I approved, one by one:',
     applyManyTail: `After each one is done and checked, call ${MARK_FIXED} with its id and say in check how you checked it.`,
     solution: 'Solution',
-    leaves: 'Leaves open',
     questions: `Questions from the Findings page. Read the code if you need to, then answer each finding through ${REPLY} with its id; in chat, one line.`,
-    discussion: 'Discussion so far',
     tell: 'Findings: here is what I did on the page. Take it into account; one line in reply is enough.',
     newsHead: 'Findings page, what the user did there since their last message:',
     newsWhat: {
@@ -925,7 +838,6 @@ const WORDS: Record<Lang, Words> = {
     lost: 'Я не понял объяснение.',
     unclear: 'Что именно непонятно:',
     viaReport: id => `Ответ сдай через ${REPORT} с id ${id} (plain, и steps, если пример меняется), в чат одной строкой.`,
-    carried: 'Это находка из прошлой сессии на этой ветке, ты её ещё не видел. Вот она целиком:',
     propose: 'предложи решение.',
     proposeOther: tried => `предложи другое решение, не такое, как ${tried}.`,
     noEdit: `Код пока не меняй. Вызови ${PROPOSE_FIX}: что поменяется простыми словами, тот же живой пример после фикса, дифф по файлам и что решение не закрывает.`,
@@ -935,9 +847,7 @@ const WORDS: Record<Lang, Words> = {
     applyMany: 'Применяй одобренные мной решения, по очереди:',
     applyManyTail: `После каждого, когда закончишь и проверишь, вызови ${MARK_FIXED} с его id и напиши в check, чем проверил.`,
     solution: 'Решение',
-    leaves: 'Не закрывает',
     questions: `Вопросы со страницы «Находки». Если нужно, прочитай код и ответь на каждую находку через ${REPLY} с её id; в чат одной строкой.`,
-    discussion: 'Обсуждение до этого',
     tell: 'Находки: вот что я сделал на странице. Учти это; в ответ хватит одной строки.',
     newsHead: 'Страница «Находки», что пользователь сделал там с прошлого сообщения:',
     newsWhat: {
@@ -969,7 +879,6 @@ const WORDS: Record<Lang, Words> = {
     lost: 'Я не зрозумів пояснення.',
     unclear: 'Що саме незрозуміло:',
     viaReport: id => `Відповідь здай через ${REPORT} з id ${id} (plain, і steps, якщо приклад змінюється), у чат одним рядком.`,
-    carried: 'Це знахідка з минулої сесії на цій гілці, ти її ще не бачив. Ось вона повністю:',
     propose: 'запропонуй рішення.',
     proposeOther: tried => `запропонуй інше рішення, не таке, як ${tried}.`,
     noEdit: `Код поки не змінюй. Виклич ${PROPOSE_FIX}: що зміниться простими словами, той самий живий приклад після фіксу, диф по файлах і що рішення не закриває.`,
@@ -979,9 +888,7 @@ const WORDS: Record<Lang, Words> = {
     applyMany: 'Застосовуй схвалені мною рішення, по черзі:',
     applyManyTail: `Після кожного, коли закінчиш і перевіриш, виклич ${MARK_FIXED} з його id і напиши в check, чим перевірив.`,
     solution: 'Рішення',
-    leaves: 'Не закриває',
     questions: `Питання зі сторінки «Знахідки». Якщо треба, прочитай код і відповідай на кожну знахідку через ${REPLY} з її id; у чат одним рядком.`,
-    discussion: 'Обговорення до цього',
     tell: 'Знахідки: ось що я зробив на сторінці. Врахуй це; у відповідь вистачить одного рядка.',
     newsHead: 'Сторінка «Знахідки», що користувач зробив там з минулого повідомлення:',
     newsWhat: {
@@ -1025,8 +932,6 @@ export const findingText = (finding: Finding, version: number, lang: Lang): stri
   ].join('\n')
 }
 
-const carriedNote = (finding: Finding, lang: Lang): string => (finding.isCarried ? `\n\n${WORDS[lang].carried}\n${findingText(finding, finding.versions.length - 1, lang)}` : '')
-
 const noteLine = (note: string, lang: Lang): string => (note === '' ? '' : ` ${WORDS[lang].note} ${note}`)
 
 const short = (body: string, limit: number): string => (body.length <= limit ? body : `${body.slice(0, limit - 1)}…`)
@@ -1065,40 +970,26 @@ export const explainPrompt = (finding: Finding, mode: 'simpler' | 'example', not
     .filter(part => part !== '')
     .join('\n\n')
 
-/** The same ask through chat: for a finding whose code this session has not read, or when the side question failed. */
+/** The same ask through chat, when the side question failed. */
 export const explainAsk = (finding: Finding, mode: 'simpler' | 'example', note: string, lang: Lang, context = ''): string => {
   const said = WORDS[lang]
 
   return withContext(
-    `${said.head(finding.id, finding.title)}: ${said.lost} ${mode === 'simpler' ? said.simpler : said.another}${note === '' ? '' : ` ${said.unclear} ${note}`}\n\n${said.viaReport(finding.id)}${carriedNote(finding, lang)}`,
+    `${said.head(finding.id, finding.title)}: ${said.lost} ${mode === 'simpler' ? said.simpler : said.another}${note === '' ? '' : ` ${said.unclear} ${note}`}\n\n${said.viaReport(finding.id)}`,
     context,
   )
 }
 
-const fixText = (fix: Fix, lang: Lang): string =>
-  [
-    `${WORDS[lang].solution} «${fix.title}»: ${fix.summary}`,
-    ...fix.changes.map(change => `${change.path}\n${change.diff}`),
-    ...(fix.gaps.length === 0 ? [] : [`${WORDS[lang].leaves}: ${fix.gaps.join('; ')}`]),
-  ].join('\n\n')
-
-const threadText = (finding: Finding, lang: Lang): string =>
-  finding.thread.length === 0 ? '' : `${WORDS[lang].discussion}:\n${finding.thread.map(message => `${message.by === 'you' ? 'User' : 'Claude'}: ${message.text}`).join('\n')}`
-
 /**
  * The questions waiting on the page, all in one message: Claude reads the code it needs and answers each finding through the reply tool.
- * The discussion before them is already in the session's transcript; only a finding of another session brings it along.
+ * The discussion before them is already in the session's transcript.
  */
 export const questionsAsk = (findings: readonly Finding[], lang: Lang, context = ''): string => {
   const said = WORDS[lang]
   const blocks = findings.map(finding => {
     const asked = finding.thread.filter(message => message.isQueued).map(message => `- ${message.text}`)
-    const before = { ...finding, thread: finding.thread.filter(message => !message.isQueued) }
-    const fix = finding.isCarried && (finding.status === 'proposed' || finding.status === 'applying') ? fixAt(finding, finding.fixes.length - 1) : null
 
-    return [`${said.head(finding.id, finding.title)} (${finding.where}):\n${asked.join('\n')}`, fix === null ? '' : fixText(fix, lang), finding.isCarried ? threadText(before, lang) : '']
-      .filter(part => part !== '')
-      .join('\n\n') + carriedNote(finding, lang)
+    return `${said.head(finding.id, finding.title)} (${finding.where}):\n${asked.join('\n')}`
   })
 
   return withContext([said.questions, ...blocks].join('\n\n'), context)
@@ -1108,7 +999,7 @@ export const fixAsk = (finding: Finding, note: string, lang: Lang, context = '')
   const said = WORDS[lang]
   const tried = finding.fixes.map(fix => `«${fix.title}»`).join(', ')
 
-  return withContext(`${said.head(finding.id, finding.title)}: ${tried === '' ? said.propose : said.proposeOther(tried)}${noteLine(note, lang)} ${said.noEdit}${carriedNote(finding, lang)}`, context)
+  return withContext(`${said.head(finding.id, finding.title)}: ${tried === '' ? said.propose : said.proposeOther(tried)}${noteLine(note, lang)} ${said.noEdit}`, context)
 }
 
 /** One message asking a solution for each of several findings. */
@@ -1117,7 +1008,7 @@ export const fixManyAsk = (findings: readonly Finding[], note: string, lang: Lan
   const named = findings.map(finding => `- ${finding.id} «${finding.title}» (${finding.where})`).join('\n')
 
   return withContext(
-    `${said.proposeMany(findings.map(finding => finding.id).join(', '))}${noteLine(note, lang)}\n\n${named}${findings.map(finding => carriedNote(finding, lang)).join('')}`,
+    `${said.proposeMany(findings.map(finding => finding.id).join(', '))}${noteLine(note, lang)}\n\n${named}`,
     context,
   )
 }
@@ -1126,7 +1017,7 @@ export const applyAsk = (finding: Finding, fix: Fix, note: string, lang: Lang, c
   const said = WORDS[lang]
 
   return withContext(
-    `${said.head(finding.id, finding.title)}: ${said.apply(fix.title, finding.id)}${noteLine(note, lang)}${finding.isCarried ? `${carriedNote(finding, lang)}\n\n${fixText(fix, lang)}` : ''}`,
+    `${said.head(finding.id, finding.title)}: ${said.apply(fix.title, finding.id)}${noteLine(note, lang)}`,
     context,
   )
 }
@@ -1135,7 +1026,7 @@ export const applyAsk = (finding: Finding, fix: Fix, note: string, lang: Lang, c
 export const applyManyAsk = (approved: readonly { finding: Finding; fix: Fix }[], note: string, lang: Lang, context = ''): string => {
   const said = WORDS[lang]
   const named = approved
-    .map(({ finding, fix }) => `- ${finding.id} «${finding.title}»: ${said.solution.toLowerCase()} «${fix.title}»${finding.isCarried ? `\n${fixText(fix, lang)}` : ''}`)
+    .map(({ finding, fix }) => `- ${finding.id} «${finding.title}»: ${said.solution.toLowerCase()} «${fix.title}»`)
     .join('\n')
 
   return withContext(`${said.applyMany}\n${named}\n\n${said.applyManyTail}${noteLine(note, lang)}`, context)

@@ -1,11 +1,10 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Entry, FileChange, Finding, Fix, Lang, Moment, PageAction, ProjectFile, State } from '../types'
+import type { Entry, FileChange, Finding, Fix, Lang, Moment, PageAction, State } from '../types'
 import {
   applyAsk,
   applyChange,
   applyManyAsk,
-  carriedFor,
   contextNote,
   DAY,
   discussText,
@@ -23,7 +22,6 @@ import {
   fixManyAsk,
   GUIDE,
   isClosed,
-  isLocal,
   langOf,
   lastNumber,
   MARK_FIXED,
@@ -31,10 +29,8 @@ import {
   parseAction,
   parseExplanation,
   parseFix,
-  parseProject,
   parseReport,
   parseState,
-  projectSlug,
   questionsAsk,
   PROPOSE_FIX,
   REPLY,
@@ -46,8 +42,6 @@ import {
   REPORT_SCHEMA,
   REPORT_TOOL,
   statusLine,
-  sweepProject,
-  syncProject,
   tellAsk,
   waitingCount,
   withFile,
@@ -103,7 +97,9 @@ const readText = async ($: EngineInterface, path: string): Promise<string> => {
   }
 }
 
-const modsData = async ($: EngineInterface): Promise<string> => `${(await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? ''}/.claude`}/mods-data`
+const configDir = async ($: EngineInterface): Promise<string> => (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? ''}/.claude`
+
+const modsData = async ($: EngineInterface): Promise<string> => `${await configDir($)}/mods-data`
 
 const dataDir = async ($: EngineInterface): Promise<string> => `${await modsData($)}/findings`
 
@@ -141,27 +137,11 @@ const ensureSession = async ($: EngineInterface): Promise<{ id: string; path: st
   return session
 }
 
-const projectPath = async ($: EngineInterface): Promise<string> => `${await dataDir($)}/projects/${projectSlug(await $.session.root())}.json`
-
-const readProject = async ($: EngineInterface): Promise<ProjectFile> => parseProject(await readText($, await projectPath($)))
-
-/** Writes the session's file, and the project's when the change touches what other sessions of the branch see. */
-const persist = async ($: EngineInterface, isShared: boolean): Promise<void> => {
+/** Writes the session's file: the one place the session's findings live. */
+const persist = async ($: EngineInterface): Promise<void> => {
   try {
     const own = await ensureSession($)
     await $.fs.write(own.path, `${JSON.stringify(current)}\n`)
-
-    if (!isShared) {
-      return
-    }
-
-    const path = await projectPath($)
-    const before = await readText($, path)
-    const after = `${JSON.stringify(syncProject(parseProject(before), current, own.id, await $.clock.now()))}\n`
-
-    if (after !== before) {
-      await $.fs.write(path, after)
-    }
   } catch {
     return
   }
@@ -192,19 +172,14 @@ const dispatch = ($: EngineInterface, change: Change): Promise<State> =>
   serial(async () => {
     current = applyChange(current, change)
     await push($)
-    await persist($, !isLocal(change))
+    await persist($)
     $.ui.status(statusLine(current.findings, lang))
 
     return current
   })
 
-/** Brings in what the branch's other sessions left waiting. */
-const carry = async ($: EngineInterface): Promise<State> => {
-  const own = await ensureSession($)
-  const branch = await git($, ['rev-parse', '--abbrev-ref', 'HEAD'])
-
-  return dispatch($, { op: 'carry', branch, findings: carriedFor(await readProject($), branch, own.id, current.findings) })
-}
+/** Notes the branch the page names in its header. */
+const noteBranch = async ($: EngineInterface): Promise<State> => dispatch($, { op: 'branch', branch: await git($, ['rev-parse', '--abbrev-ref', 'HEAD']) })
 
 /** Fills the state once per load: the session's file (a restart, a resume), else what the hub holds. */
 const restore = async ($: EngineInterface): Promise<void> => {
@@ -221,10 +196,14 @@ const restore = async ($: EngineInterface): Promise<void> => {
   }
 
   current = saved ?? EMPTY
-  await carry($)
+  await noteBranch($)
 }
 
-/** Once a day: session files untouched for 30 days go, and the findings of branches deleted that long ago. */
+/**
+ * Once a day: deletes the files of sessions whose chat Claude Code has already removed (it keeps them
+ * `cleanupPeriodDays`, 30 by default) and that were not touched for 30 days, and the project files of the versions
+ * that shared findings between sessions. Nothing is deleted when the chats cannot be listed.
+ */
 const sweep = async ($: EngineInterface): Promise<void> => {
   try {
     const now = await $.clock.now()
@@ -234,25 +213,22 @@ const sweep = async ($: EngineInterface): Promise<void> => {
     }
 
     await $.store.set('lastSweep', now)
-    const dir = `${await dataDir($)}/sessions`
-    const stale = (await $.fs.exists(dir)) ? (await $.fs.list(dir)).filter(entry => entry.kind === 'file' && entry.name.endsWith('.json') && now - entry.mtimeMs > 30 * DAY) : []
+    const data = await dataDir($)
+    await $.process.run(['rm', '-rf', `${data}/projects`])
+    const listed = await $.process.run(['find', `${await configDir($)}/projects`, '-maxdepth', '2', '-name', '*.jsonl'])
+    const chats = new Set(listed.stdout.split('\n').map(line => line.trim().split('/').at(-1)?.replace(/\.jsonl$/, '') ?? '').filter(id => id !== ''))
 
-    if (stale.length > 0) {
-      await $.process.run(['rm', '-f', ...stale.map(entry => `${dir}/${entry.name}`)])
-    }
-
-    const branches = (await git($, ['branch', '--format=%(refname:short)'])).split('\n').filter(name => name !== '')
-
-    if (branches.length === 0) {
+    if (listed.exitCode !== 0 || chats.size === 0) {
       return
     }
 
-    const path = await projectPath($)
-    const file = parseProject(await readText($, path))
-    const swept = sweepProject(file, branches, now)
+    const dir = `${data}/sessions`
+    const stale = (await $.fs.list(dir))
+      .filter(entry => entry.kind === 'file' && entry.name.endsWith('.json'))
+      .filter(entry => !chats.has(entry.name.replace(/\.json$/, '')) && now - entry.mtimeMs > 30 * DAY)
 
-    if (swept.standing.length !== file.standing.length) {
-      await $.fs.write(path, `${JSON.stringify(swept)}\n`)
+    if (stale.length > 0) {
+      await $.process.run(['rm', '-f', ...stale.map(entry => `${dir}/${entry.name}`)])
     }
   } catch {
     return
@@ -310,19 +286,11 @@ const dismissedDeny = (ids: readonly string[]): { deny: string } | null => {
 const tell = ($: EngineInterface, finding: Finding, what: Moment, note: string, at: number): Promise<State> =>
   dispatch($, { op: 'news', news: { at, what, id: finding.id, title: finding.title, note } })
 
-/** A quick side answer over this conversation; through chat when the session has not read the code, or the side answer failed. */
+/** A quick side answer over this conversation; through chat when the side answer failed. */
 const explain = async ($: EngineInterface, finding: Finding, action: PageAction, entry: Entry): Promise<void> => {
   const mode = action.type === 'simpler' ? 'simpler' : 'example'
 
   if (finding.busy !== null) {
-    return
-  }
-
-  if (finding.isCarried) {
-    if (await deliver($, note => explainAsk(finding, mode, action.note, lang, note))) {
-      await dispatch($, { op: 'note', id: finding.id, entry })
-    }
-
     return
   }
 
@@ -697,9 +665,8 @@ export const register: Register = on => {
       return refused
     }
 
-    const state = await carry($)
-    const lastNo = Math.max((await readProject($)).lastNo, lastNumber(state.findings))
-    const parsed = parseReport(e as unknown as Record<string, unknown>, lastNo, state.findings)
+    const state = await noteBranch($)
+    const parsed = parseReport(e as unknown as Record<string, unknown>, lastNumber(state.findings), state.findings)
 
     if (parsed.errors !== undefined) {
       return { deny: `${REPORT} refused, nothing was shown. Fix these and call it again:\n- ${parsed.errors.join('\n- ')}` }

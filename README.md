@@ -31,7 +31,7 @@ Every action takes an optional note: type it in the field above the buttons and 
 
 ### Discussion
 
-Under each finding there is a discussion: ask about the finding or its solution right there. By default the answer comes on the side, from what Claude already knows of the session, and nothing reaches the chat. Tick **With access to the code** and the question goes through the session instead: Claude reads the code it needs and answers in the card through the `reply` tool. A finding from another session is always asked that way.
+Under each finding there is a discussion: ask about the finding or its solution right there. The question goes to the session chat as a message from you: Claude reads the code it needs, answers in the card through the `reply` tool, and says one line in chat. **Ask** sends the question at once. **Queue** keeps it on the card, marked "not sent yet" (it can be removed there); above the list a line shows how many questions are queued, with a **Send questions** button that sends the questions of every card in one message, grouped by finding. One message instead of several is one turn for Claude: the conversation goes to the model once, and a file two questions need is read once.
 
 ### Several findings at once
 
@@ -43,7 +43,7 @@ The code of a solution has three views, switched in the code block's header and 
 
 ### What Claude is told
 
-What you do on the page without sending a message (**Not a problem**, **Set aside**, reopening, cancelling a solution, clearing closed findings, a side question and its answer) is gathered and goes to Claude with your next message, whether you write in the chat or press a button that sends one. Changes go once; the lists of findings closed as "not a problem" and set aside go with every message, so Claude does not raise them again.
+What you do on the page without sending a message (**Not a problem**, **Set aside**, reopening, cancelling a solution, clearing closed findings) is gathered and goes to Claude with your next message, whether you write in the chat or press a button that sends one. Changes go once; the lists of findings closed as "not a problem" and set aside go with every message, so Claude does not raise them again.
 
 You do not have to write anything for it to arrive. Above the list a line says what Claude does not know yet, with a **Tell Claude** button that sends it at once. And when you close or set aside the last finding that was waiting for you, it goes by itself six seconds later: time enough for **Undo**. Say you close five findings as "not a problem": right after the fifth, Claude gets one message with all five and your notes. **Tools and rule for Claude** on the page shows exactly what will go.
 
@@ -132,7 +132,7 @@ Then start a new session. The installed version is in `/plugin` under **Installe
 
 1. Ask Claude for a review, an audit or an investigation. With two or more findings Claude calls the `report` tool instead of writing a list, and says in one line that the findings are on the page, with its address.
 2. `/findings` prints the page's address at any time. The hub lists the page under the session's name too, with the number of findings waiting for you.
-3. Work through the cards. A press goes to Claude as a message from you; "Simpler", "Another example" and questions in the discussion are answered on the side and never reach the chat, unless you ask with access to the code or the quick answer fails.
+3. Work through the cards. A press goes to Claude as a message from you; "Simpler" and "Another example" are answered on the side and never reach the chat, unless the quick answer fails. Questions in the discussion always go through the chat, one at a time or as a batch from the queue.
 
 The status line shows `Findings: N` while N findings wait for you.
 
@@ -166,7 +166,7 @@ The mod adds a rule to the system prompt and four tools:
 - `mcp__findings__report`: show findings, or a new explanation of one (`id`). Concrete values in the example are wrapped in `{{double braces}}` and set apart on the card.
 - `mcp__findings__propose_fix`: show a solution in the card, before any code changes.
 - `mcp__findings__mark_fixed`: mark a finding fixed after the edit, with `check`: how it was checked.
-- `mcp__findings__reply`: answer a question asked from the page with access to the code; the answer shows in the finding's discussion.
+- `mcp__findings__reply`: answer a question asked from the page; the answer shows in the finding's discussion. For a batch of questions Claude calls it once per finding.
 
 ## Development
 

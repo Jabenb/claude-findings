@@ -1,0 +1,11 @@
+{
+  "name": "claude-razbor",
+  "owner": { "name": "jabenb" },
+  "plugins": [
+    {
+      "name": "razbor",
+      "source": "./",
+      "description": "Razbor: review findings as cards on a browser page, each with a live example and a solution you approve before any code changes"
+    }
+  ]
+}

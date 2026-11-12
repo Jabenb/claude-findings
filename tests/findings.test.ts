@@ -184,6 +184,7 @@ const world = (on: On, files: Record<string, string> = {}): World => {
 
     return { isFilled: true, text: e.text, cursor: e.text.length } as never
   })
+  on('session.compact', () => ({ messages: [{ role: 'user', text: 'пересказ', toolUses: [] }] }) as never)
   on('model.fork', (_, e) => {
     held.forked.push(e.prompt)
 
@@ -295,6 +296,17 @@ test('cancel puts a request in flight back, and drops a solution on the card', a
   const after = ['R1', 'R2', 'R3', 'R4'].reduce((acc, id) => applyChange(acc, { op: 'cancel', id, at: 1 }), state)
 
   expect(after.findings.map(one => [one.id, one.status, one.fixes.length])).toEqual([['R1', 'open', 0], ['R2', 'proposed', 1], ['R3', 'proposed', 1], ['R4', 'open', 0]])
+})
+
+test('the standing lists are told once; a compaction or a finding carried in from another session makes them go again', async () => {
+  const told = applyChange({ ...EMPTY, findings: [finding('R1', { status: 'dismissed' })] }, { op: 'told' })
+
+  expect(told.isStandingTold).toBe(true)
+  expect(contextNote(told, 'ru')).toBe('')
+  expect(applyChange(told, { op: 'carry', findings: [], branch: 'b' }).isStandingTold).toBe(true)
+  expect(applyChange(told, { op: 'carry', findings: [finding('R5', { status: 'deferred', isCarried: true })], branch: 'b' }).isStandingTold).toBe(false)
+  expect(contextNote(applyChange(told, { op: 'compacted' }), 'ru')).toBe('Пользователь закрыл как «не проблема», не поднимай их как проблему снова: R1.')
+  expect(parseState(JSON.stringify(told))!.isStandingTold).toBe(true)
 })
 
 test('a file written by the pane version of the mod is read into the new shape', async () => {
@@ -409,7 +421,7 @@ test('a deferred finding leaves the badge, stays for the branch and rides on the
   expect(shown(held).news).toEqual([])
 
   await $.prompt.submit({ text: 'и ещё', wait: false, origin: { kind: 'composer' } })
-  expect(held.submitted.at(-1)?.context).toEqual(['Отложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: R1.'])
+  expect(held.submitted.at(-1)).toEqual({ text: 'и ещё' })
 
   await press({ type: 'restore' })
   expect(one(held, 'R1').status).toBe('open')
@@ -546,7 +558,7 @@ test('a proposed solution carries the file it changes for the whole-file view, b
   expect(project(held).standing[0]?.finding.fixes[0]?.changes.map(change => change.full)).toEqual([null, null])
 })
 
-test('"not a problem" reaches Claude: once as news with the note, and as a standing list on every message', async ($, on) => {
+test('"not a problem" reaches Claude once, as news with the note and the standing list, and again only after a compaction', async ($, on) => {
   const { held, press } = await started($, on)
   await call($, REPORT, { findings: [RENAME, REBUILD] })
 
@@ -564,6 +576,32 @@ test('"not a problem" reaches Claude: once as news with the note, and as a stand
     ].join('\n'),
   )
   expect(shown(held).news).toEqual([])
+
+  await $.prompt.submit({ text: 'а теперь?', wait: false, origin: { kind: 'composer' } })
+  expect(held.submitted.at(-1)).toEqual({ text: 'а теперь?' })
+
+  await $.session.compact({ trigger: 'auto', messages: [{ role: 'user', text: 'до сжатия', toolUses: [] }] } as never)
+  await $.prompt.submit({ text: 'после сжатия', wait: false, origin: { kind: 'composer' } })
+  expect(held.submitted.at(-1)?.context).toEqual(['Пользователь закрыл как «не проблема», не поднимай их как проблему снова: R2.'])
+
+  await $.prompt.submit({ text: 'и дальше', wait: false, origin: { kind: 'composer' } })
+  expect(held.submitted.at(-1)).toEqual({ text: 'и дальше' })
+})
+
+test('the tools refuse a finding closed as "not a problem", and take it again once it is reopened', async ($, on) => {
+  const { press } = await started($, on)
+  await call($, REPORT, { findings: [RENAME, REBUILD] })
+  await press({ type: 'dismiss', id: 'R2' })
+
+  const refusals = [
+    await call($, PROPOSE_FIX, { ...FIX, id: 'R2' }),
+    await call($, REPORT, { findings: [{ id: 'R2', plain: 'Ещё раз.', steps: [{ text: 'Отель {{1}}' }, { text: 'Дубль', tone: 'bad' }] }] }),
+    await call($, MARK_FIXED, { id: 'R2', check: 'тесты' }),
+  ]
+  expect(refusals.map(one => one.deny)).toEqual(Array(3).fill('R2: closed by the user as "not a problem". Nothing was shown. Do not explain, fix or mark it, and do not raise it again unless the user reopens it.'))
+
+  await press({ type: 'restore', id: 'R2' })
+  expect((await call($, MARK_FIXED, { id: 'R2', check: 'тесты' })).deny).toBe(undefined)
 })
 
 test('news a press of the page sends goes inside that message, and is not added twice', async ($, on) => {

@@ -1,6 +1,6 @@
 {
   "name": "findings",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Findings: review findings as cards on a browser page, each explained in plain words on a live step-by-step example, with a solution you approve before any code changes",
   "author": {
     "name": "jabenb"

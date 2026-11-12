@@ -290,6 +290,22 @@ const deliver = async ($: EngineInterface, build: (note: string) => string): Pro
 
 const findingOf = (id: string): Finding | undefined => current.findings.find(finding => finding.id === id)
 
+/** The ids a report names: new explanations of findings already on the page. */
+const reportedIds = (input: unknown): string[] => {
+  const findings = (input as { findings?: unknown }).findings
+
+  return Array.isArray(findings) ? findings.map(one => String((one as { id?: unknown } | null)?.id ?? '').trim()).filter(id => id !== '') : []
+}
+
+/** A tool call on a finding the person closed as "not a problem" is refused: the mod keeps it, so Claude need not be reminded on every message. */
+const dismissedDeny = (ids: readonly string[]): { deny: string } | null => {
+  const closed = ids.filter(id => findingOf(id)?.status === 'dismissed')
+
+  return closed.length === 0
+    ? null
+    : { deny: `${closed.join(', ')}: closed by the user as "not a problem". Nothing was shown. Do not explain, fix or mark it, and do not raise it again unless the user reopens it.` }
+}
+
 /** Something the person did on the page that sends no message: Claude hears of it with the next one. */
 const tell = ($: EngineInterface, finding: Finding, what: Moment, note: string, at: number): Promise<State> =>
   dispatch($, { op: 'news', news: { at, what, id: finding.id, title: finding.title, note } })
@@ -654,8 +670,19 @@ export const register: Register = on => {
 
     const result = await next({ ...e, context: [...(e.context ?? []), note] })
 
-    if (result.drop === undefined && current.news.length > 0) {
+    if (result.drop === undefined) {
       await dispatch($, { op: 'told' })
+    }
+
+    return result
+  })
+
+  /** A compaction may drop what Claude was told: the standing lists go once more with the next message. */
+  on('session.compact', async ($, e, next) => {
+    const result = await next(e)
+
+    if (e.agentId === undefined && result.skip === undefined) {
+      await dispatch($, { op: 'compacted' })
     }
 
     return result
@@ -664,6 +691,12 @@ export const register: Register = on => {
   on('command.run', { command: COMMAND }, async $ => ({ text: (await show($)) ? words(lang).page(url) : words(lang).down }))
 
   on('tool.call', { tool: REPORT_CALL }, async ($, e) => {
+    const refused = dismissedDeny(reportedIds(e))
+
+    if (refused !== null) {
+      return refused
+    }
+
     const state = await carry($)
     const lastNo = Math.max((await readProject($)).lastNo, lastNumber(state.findings))
     const parsed = parseReport(e as unknown as Record<string, unknown>, lastNo, state.findings)
@@ -692,6 +725,12 @@ export const register: Register = on => {
   })
 
   on('tool.call', { tool: FIX_CALL }, async ($, e) => {
+    const refused = dismissedDeny([String((e as unknown as { id?: unknown }).id ?? '').trim()])
+
+    if (refused !== null) {
+      return refused
+    }
+
     const parsed = parseFix(e as unknown as Record<string, unknown>, current.findings)
 
     if (parsed.errors !== undefined) {
@@ -723,6 +762,12 @@ export const register: Register = on => {
 
     if (findingOf(id) === undefined) {
       return { deny: `No finding with id "${id}" on the Findings page.` }
+    }
+
+    const refused = dismissedDeny([id])
+
+    if (refused !== null) {
+      return refused
     }
 
     if (check === '') {

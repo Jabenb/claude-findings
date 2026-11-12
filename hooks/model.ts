@@ -37,7 +37,7 @@ const EVENTS_KEPT = 10
 /** A file bigger than this is not kept for the whole-file view: the diff alone is shown. */
 export const FULL_FILE_LIMIT = 400_000
 
-export const EMPTY: State = { findings: [], branch: '', events: [], news: [], updatedAt: 0 }
+export const EMPTY: State = { findings: [], branch: '', events: [], news: [], updatedAt: 0, isStandingTold: false }
 export const EMPTY_PROJECT: ProjectFile = { lastNo: 0, standing: [] }
 
 export const GUIDE = [
@@ -537,9 +537,10 @@ export type Change =
   | { op: 'sent'; event: Sent }
   | { op: 'news'; news: News }
   | { op: 'told' }
+  | { op: 'compacted' }
 
 /** Changes only this session's page shows: the project's file is left alone. */
-export const isLocal = (change: Change): boolean => ['busy', 'sent', 'note', 'news', 'told', 'queue', 'unqueue', 'sending', 'answer'].includes(change.op)
+export const isLocal = (change: Change): boolean => ['busy', 'sent', 'note', 'news', 'told', 'compacted', 'queue', 'unqueue', 'sending', 'answer'].includes(change.op)
 
 const edit = (state: State, id: string, change: (finding: Finding) => Finding): State => ({
   ...state,
@@ -580,7 +581,7 @@ export const applyChange = (state: State, change: Change): State => {
     case 'carry': {
       const known = change.findings.filter(finding => !state.findings.some(one => one.id === finding.id))
 
-      return { ...state, branch: change.branch, findings: [...state.findings, ...known] }
+      return { ...state, branch: change.branch, findings: [...state.findings, ...known], isStandingTold: state.isStandingTold && known.length === 0 }
     }
     case 'busy':
       return edit(state, change.id, finding => logged({ ...finding, busy: change.busy }, change.entry))
@@ -629,7 +630,9 @@ export const applyChange = (state: State, change: Change): State => {
     case 'news':
       return { ...state, news: [...state.news.filter(one => !(one.id === change.news.id && cancels(one.what, change.news.what))), change.news] }
     case 'told':
-      return { ...state, news: [] }
+      return { ...state, news: [], isStandingTold: true }
+    case 'compacted':
+      return { ...state, isStandingTold: false }
   }
 }
 
@@ -728,6 +731,7 @@ export const parseState = (body: string): State | null => {
           events: parseEvents(raw.events),
           news: parseNews(raw.news),
           updatedAt: Number(raw.updatedAt) || 0,
+          isStandingTold: raw.isStandingTold === true,
         }
       : null
   } catch {
@@ -1029,7 +1033,7 @@ const short = (body: string, limit: number): string => (body.length <= limit ? b
 
 /**
  * What goes to Claude beside a message: what the person did on the page since the last one (once), and which findings
- * stand closed as "not a problem" or set aside (every time). Empty when there is nothing to say.
+ * stand closed as "not a problem" or set aside (once, and again after a compaction). Empty when there is nothing to say.
  */
 export const contextNote = (state: State, lang: Lang): string => {
   const said = WORDS[lang]
@@ -1039,8 +1043,8 @@ export const contextNote = (state: State, lang: Lang): string => {
 
   return [
     ...(news.length === 0 ? [] : [`${said.newsHead}\n${news.join('\n')}`]),
-    ...(dismissed.length === 0 ? [] : [said.standingDismissed(dismissed.join(', '))]),
-    ...(deferred.length === 0 ? [] : [said.standingDeferred(deferred.join(', '))]),
+    ...(state.isStandingTold || dismissed.length === 0 ? [] : [said.standingDismissed(dismissed.join(', '))]),
+    ...(state.isStandingTold || deferred.length === 0 ? [] : [said.standingDeferred(deferred.join(', '))]),
   ].join('\n')
 }
 

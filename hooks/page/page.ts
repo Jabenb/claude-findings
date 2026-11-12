@@ -514,7 +514,7 @@ var MORE = {
     approve: 'Одобрить', unapprove: 'Снять одобрение', approvedChip: 'Одобрено', approvedN: function (n) { return 'Одобрено решений: ' + n }, applyApproved: 'Применить одобренные',
     bulkHint: 'Claude предложит решение для каждой отмеченной, отдельно в её карточке. Код не меняется.',
     approveHint: 'Одобренные применяются одним сообщением, по очереди.',
-    seesLbl: 'Что уйдёт Claude с твоим следующим сообщением', seesHint: 'Изменения уходят один раз; списки «не проблема» и «отложены» — с каждым сообщением.', seesNone: '(ничего: изменений нет, закрытых и отложенных нет)',
+    seesLbl: 'Что уйдёт Claude с твоим следующим сообщением', seesHint: 'Изменения уходят один раз. Списки «не проблема» и «отложены» тоже уходят один раз и ещё раз после сжатия разговора; закрытые инструменты Claude не трогают.', seesNone: '(ничего: изменений нет, списки Claude уже знает)',
     newsHead: 'Страница «Находки», что пользователь сделал там с прошлого сообщения:',
     newsWhat: { dismiss: 'закрыта как «не проблема»', defer: 'отложена', restore: 'возвращена в работу', cancel: 'предложенное решение отменено, по нему ничего не меняй', clear: 'убрана со страницы (была закрыта)', ask: 'вопрос сбоку от чата' },
     standingDismissed: function (ids) { return 'Пользователь закрыл как «не проблема», не поднимай их как проблему снова: ' + ids + '.' },
@@ -536,7 +536,7 @@ var MORE = {
     approve: 'Approve', unapprove: 'Withdraw approval', approvedChip: 'Approved', approvedN: function (n) { return n + ' approved' }, applyApproved: 'Apply approved',
     bulkHint: 'Claude proposes a solution for each selected finding, in its own card. No code changes.',
     approveHint: 'Approved solutions are applied in one message, one by one.',
-    seesLbl: 'What goes to Claude with your next message', seesHint: 'Changes go once; the "not a problem" and "set aside" lists go with every message.', seesNone: '(nothing: no changes, nothing closed or set aside)',
+    seesLbl: 'What goes to Claude with your next message', seesHint: 'Changes go once. The "not a problem" and "set aside" lists go once too, and again after the conversation is compacted; Claude\'s tools refuse closed findings.', seesNone: '(nothing: no changes, Claude already knows the lists)',
     newsHead: 'Findings page, what the user did there since their last message:',
     newsWhat: { dismiss: 'closed as "not a problem"', defer: 'set aside', restore: 'reopened', cancel: 'the proposed solution is cancelled, change nothing for it', clear: 'removed from the page (it was closed)', ask: 'asked beside the chat' },
     standingDismissed: function (ids) { return 'Closed by the user as "not a problem", do not raise them as problems again: ' + ids + '.' },
@@ -558,7 +558,7 @@ var MORE = {
     approve: 'Схвалити', unapprove: 'Зняти схвалення', approvedChip: 'Схвалено', approvedN: function (n) { return 'Схвалено рішень: ' + n }, applyApproved: 'Застосувати схвалені',
     bulkHint: 'Claude запропонує рішення для кожної позначеної, окремо в її картці. Код не змінюється.',
     approveHint: 'Схвалені застосовуються одним повідомленням, по черзі.',
-    seesLbl: 'Що піде Claude з твоїм наступним повідомленням', seesHint: 'Зміни йдуть один раз; списки «не проблема» і «відкладені» — з кожним повідомленням.', seesNone: '(нічого: змін немає, закритих і відкладених немає)',
+    seesLbl: 'Що піде Claude з твоїм наступним повідомленням', seesHint: 'Зміни йдуть один раз. Списки «не проблема» і «відкладені» теж ідуть один раз і ще раз після стиснення розмови; закриті інструменти Claude не чіпають.', seesNone: '(нічого: змін немає, списки Claude вже знає)',
     newsHead: 'Сторінка «Знахідки», що користувач зробив там з минулого повідомлення:',
     newsWhat: { dismiss: 'закрита як «не проблема»', defer: 'відкладена', restore: 'повернута в роботу', cancel: 'запропоноване рішення скасовано, нічого за ним не змінюй', clear: 'прибрана зі сторінки (була закрита)', ask: 'питання збоку від чату' },
     standingDismissed: function (ids) { return 'Користувач закрив як «не проблема», не піднімай їх як проблему знову: ' + ids + '.' },
@@ -1089,8 +1089,8 @@ function contextPreview() {
   if (state.news && state.news.length) lines.push(t.newsHead + '\n' + state.news.map(function (n) { return '- ' + n.id + ' «' + n.title + '»: ' + (t.newsWhat[n.what] || n.what) + (n.note ? ': ' + n.note : '') }).join('\n'))
   var dismissed = state.findings.filter(function (f) { return f.status === 'dismissed' }).map(function (f) { return f.id })
   var deferred = state.findings.filter(function (f) { return f.status === 'deferred' }).map(function (f) { return f.id })
-  if (dismissed.length) lines.push(t.standingDismissed(dismissed.join(', ')))
-  if (deferred.length) lines.push(t.standingDeferred(deferred.join(', ')))
+  if (dismissed.length && !state.isStandingTold) lines.push(t.standingDismissed(dismissed.join(', ')))
+  if (deferred.length && !state.isStandingTold) lines.push(t.standingDeferred(deferred.join(', ')))
   return lines.join('\n')
 }
 

@@ -84,7 +84,11 @@ export type Sent = { at: number; what: Moment; id: string; note: string }
 export type News = { at: number; what: Moment; id: string; title: string; note: string }
 
 /** What the page draws; the same value is this session's file. */
-export type State = { findings: Finding[]; branch: string; events: Sent[]; news: News[]; updatedAt: number }
+/**
+ * `isStandingTold`: Claude was told which findings stand closed as "not a problem" or set aside, and the transcript still holds it.
+ * Cleared by a compaction and by findings carried in from another session.
+ */
+export type State = { findings: Finding[]; branch: string; events: Sent[]; news: News[]; updatedAt: number; isStandingTold: boolean }
 
 /** A finding still waiting on the person, as the project's file keeps it for the branch's other sessions. */
 export type Standing = { branch: string; sessionId: string; updatedAt: number; finding: Finding }

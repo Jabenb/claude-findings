@@ -1,11 +1,21 @@
 {
   "name": "findings",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Findings: review findings as cards on a browser page, each explained in plain words on a live step-by-step example, with a solution you approve before any code changes",
-  "author": { "name": "jabenb" },
+  "author": {
+    "name": "jabenb"
+  },
   "homepage": "https://github.com/jabenb/claude-findings",
   "repository": "https://github.com/jabenb/claude-findings",
   "license": "MIT",
-  "keywords": ["review", "findings", "audit", "webhub", "mod"],
-  "dependencies": ["webhub"]
+  "keywords": [
+    "review",
+    "findings",
+    "audit",
+    "webhub",
+    "mod"
+  ],
+  "dependencies": [
+    "webhub@claude-webhub"
+  ]
 }

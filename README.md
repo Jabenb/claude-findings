@@ -150,12 +150,12 @@ The page never rebuilds what is on screen. Each render is merged into the DOM no
 
 ## How data is kept
 
-Everything lives in `~/.claude/mods-data/findings/` (inside `$CLAUDE_CONFIG_DIR` when it is set); nothing appears in the project's repository:
+Each session has its own file, `~/.claude/mods-data/findings/sessions/<session id>.json` (inside `$CLAUDE_CONFIG_DIR` when it is set); nothing appears in the project's repository. It holds the session's findings, explanations, solutions and history, so the page comes back as you left it after a restart or `--resume`.
 
-- `sessions/<session id>.json`: the session's findings, explanations, solutions and history, so the page comes back after a restart or `--resume`. Files untouched for 30 days are deleted once a day.
-- `projects/<project path>.json`: the findings still waiting for you, per git branch. Another session on the same branch shows them too, marked "From another session"; since that session has not read the code, its requests carry the finding itself.
+- **Own numbering.** Every session counts its findings from R1. One session's findings never show in another, even on the same branch.
+- **Cleanup.** Once a day the mod deletes the files of sessions whose chat Claude Code has already removed (it keeps chats for `cleanupPeriodDays`, 30 by default) and that were not touched for 30 days. Nothing is deleted when the chats cannot be listed. The `projects/` folder, where earlier versions shared findings between sessions, goes in the same cleanup.
 
-Findings of a branch deleted locally are forgotten 30 days after anyone last touched them. The hub keeps its own copy of the page's state as well.
+The hub keeps its own copy of the page's state as well.
 
 The mod used to be called Razbor (`razbor`). On its first start it copies the data over from `~/.claude/mods-data/razbor/` when the new folder does not exist yet; files of the earlier pane-based version are read as they are. The tools are now named `mcp__findings__*`.
 

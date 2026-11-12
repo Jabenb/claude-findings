@@ -1081,7 +1081,10 @@ const fixText = (fix: Fix, lang: Lang): string =>
 const threadText = (finding: Finding, lang: Lang): string =>
   finding.thread.length === 0 ? '' : `${WORDS[lang].discussion}:\n${finding.thread.map(message => `${message.by === 'you' ? 'User' : 'Claude'}: ${message.text}`).join('\n')}`
 
-/** The questions waiting on the page, all in one message: Claude reads the code it needs and answers each finding through the reply tool. */
+/**
+ * The questions waiting on the page, all in one message: Claude reads the code it needs and answers each finding through the reply tool.
+ * The discussion before them is already in the session's transcript; only a finding of another session brings it along.
+ */
 export const questionsAsk = (findings: readonly Finding[], lang: Lang, context = ''): string => {
   const said = WORDS[lang]
   const blocks = findings.map(finding => {
@@ -1089,7 +1092,7 @@ export const questionsAsk = (findings: readonly Finding[], lang: Lang, context =
     const before = { ...finding, thread: finding.thread.filter(message => !message.isQueued) }
     const fix = finding.isCarried && (finding.status === 'proposed' || finding.status === 'applying') ? fixAt(finding, finding.fixes.length - 1) : null
 
-    return [`${said.head(finding.id, finding.title)} (${finding.where}):\n${asked.join('\n')}`, fix === null ? '' : fixText(fix, lang), threadText(before, lang)]
+    return [`${said.head(finding.id, finding.title)} (${finding.where}):\n${asked.join('\n')}`, fix === null ? '' : fixText(fix, lang), finding.isCarried ? threadText(before, lang) : '']
       .filter(part => part !== '')
       .join('\n\n') + carriedNote(finding, lang)
   })

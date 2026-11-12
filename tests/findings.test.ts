@@ -17,6 +17,7 @@ import {
   parseProject,
   parseReport,
   parseState,
+  questionsAsk,
   stepsAt,
   sweepProject,
   syncProject,
@@ -482,6 +483,17 @@ test('a fix asked for a finding of another session carries the finding itself', 
   expect(fixAsk(carried, '', 'ru', note)).toMatch(/Отложены пользователем, не чини и не поднимай их, пока он сам их не вернёт: R2\.$/)
 })
 
+test('only a finding of another session brings its discussion along with the queued questions', async () => {
+  const thread = [
+    { at: 1, by: 'you' as const, text: 'первый?', isQueued: false },
+    { at: 2, by: 'claude' as const, text: 'Да.', isQueued: false },
+    { at: 3, by: 'you' as const, text: 'а второй?', isQueued: true },
+  ]
+
+  expect(questionsAsk([finding('R1', { thread })], 'ru')).not.toContain('первый?')
+  expect(questionsAsk([finding('R5', { thread, isCarried: true })], 'ru')).toContain('- а второй?\n\nОбсуждение до этого:\nUser: первый?\nClaude: Да.\n\nЭто находка из прошлой сессии')
+})
+
 test('a new session of the branch shows what the last one left, and asks about it through chat', async ($, on) => {
   const left: ProjectFile = {
     lastNo: 6,
@@ -588,7 +600,7 @@ test('a question goes through the session at once, and comes back through reply'
   expect(one(held, 'R1').thread.at(-1)).toEqual({ at: NOW + 1000, by: 'claude', text: 'В трёх местах: импорт, календарь, вебхук.', isQueued: false })
 })
 
-test('queued questions wait on their cards and go together in one message, with the discussion before them', async ($, on) => {
+test('queued questions wait on their cards and go together in one message, without the discussion the session already has', async ($, on) => {
   const { held, press } = await started($, on)
   await call($, REPORT, { findings: [RENAME, REBUILD] })
   await press({ type: 'ask', note: 'первый?' })
@@ -609,7 +621,6 @@ test('queued questions wait on their cards and go together in one message, with 
     [
       'Вопросы со страницы «Находки». Если нужно, прочитай код и ответь на каждую находку через mcp__findings__reply с её id; в чат одной строкой.',
       'Находка R1 «Окно между деплоем и rename» (app/Webhook.php:58):\n- почему окно?\n- надолго?',
-      'Обсуждение до этого:\nUser: первый?\nClaude: Да.',
       'Находка R2 «Двойная пересборка юнитов» (app/PropertyAdapter.php:12):\n- сколько раз?',
     ].join('\n\n'),
   )

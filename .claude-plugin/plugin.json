@@ -1,10 +1,10 @@
 {
-  "name": "razbor",
+  "name": "findings",
   "version": "0.2.0",
-  "description": "Razbor: review findings as cards on a browser page, each explained in plain words on a live step-by-step example, with a solution you approve before any code changes",
+  "description": "Findings: review findings as cards on a browser page, each explained in plain words on a live step-by-step example, with a solution you approve before any code changes",
   "author": { "name": "jabenb" },
-  "homepage": "https://github.com/jabenb/claude-razbor",
-  "repository": "https://github.com/jabenb/claude-razbor",
+  "homepage": "https://github.com/jabenb/claude-findings",
+  "repository": "https://github.com/jabenb/claude-findings",
   "license": "MIT",
   "keywords": ["review", "findings", "audit", "webhub", "mod"],
   "dependencies": ["webhub"]

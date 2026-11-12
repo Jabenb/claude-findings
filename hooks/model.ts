@@ -1,7 +1,7 @@
 import type { Entry, Explanation, FileChange, Finding, Fix, Lang, Moment, PageAction, ProjectFile, Sent, Severity, Standing, State, Status, Step, Tone, Witness } from '../types'
 
 /** The mod's name in the hub and in the tool names; kept equal to `name` in plugin.json. */
-export const MOD = 'razbor'
+export const MOD = 'findings'
 export const REPORT_TOOL = 'report'
 export const FIX_TOOL = 'propose_fix'
 export const DONE_TOOL = 'mark_fixed'
@@ -16,8 +16,8 @@ export const EMPTY: State = { findings: [], branch: '', events: [], updatedAt: 0
 export const EMPTY_PROJECT: ProjectFile = { lastNo: 0, standing: [] }
 
 export const GUIDE = [
-  '# Razbor page (findings)',
-  `When a review, an audit or an investigation leaves you with two or more findings (bugs, risks, regressions, design problems), do not describe them as a list in chat: call ${REPORT} with all of them, most severe first, then end with one short line saying the findings are on the Razbor page. The user reads each finding alone in a card and has not read the code, so a finding is only useful with a live example:`,
+  '# Findings page',
+  `When a review, an audit or an investigation leaves you with two or more findings (bugs, risks, regressions, design problems), do not describe them as a list in chat: call ${REPORT} with all of them, most severe first, then end with one short line saying the findings are on the Findings page. The user reads each finding alone in a card and has not read the code, so a finding is only useful with a live example:`,
   [
     '- `plain`: one or two sentences a person who never opened this code understands. No class, method or table names here, no jargon.',
     '- `steps`: one concrete scenario, step by step, 3 to 6 steps. Every step names real values: an id, a time, a field with its value, an amount, a count. Wrap each such value in double braces so the card sets it apart: "Hotel {{4471}} gets a webhook at {{14:03}} with {{price = 120 €}}". Take the values from the code and data you actually read; a value you made up for illustration is fine, but then say "for example". Mark the step where things go wrong with tone `bad`, and a step where things are right again with `good`.',
@@ -44,7 +44,7 @@ const STEPS_SCHEMA = {
 } as const
 
 export const REPORT_DESCRIPTION =
-  'Show findings on the Razbor page in the user\'s browser, each explained on a live step-by-step example. Use instead of listing findings in chat whenever you have two or more. With `id` (like "R4") an entry adds a new explanation to that finding instead of creating one.'
+  'Show findings on the Findings page in the user\'s browser, each explained on a live step-by-step example. Use instead of listing findings in chat whenever you have two or more. With `id` (like "R4") an entry adds a new explanation to that finding instead of creating one.'
 
 export const REPORT_SCHEMA = {
   type: 'object',
@@ -81,7 +81,7 @@ export const REPORT_SCHEMA = {
   required: ['findings'],
 } as const
 
-export const FIX_DESCRIPTION = 'Show a proposed solution for one finding on the Razbor page, before any code is changed. The user approves it there.'
+export const FIX_DESCRIPTION = 'Show a proposed solution for one finding on the Findings page, before any code is changed. The user approves it there.'
 
 export const FIX_SCHEMA = {
   type: 'object',
@@ -107,7 +107,7 @@ export const FIX_SCHEMA = {
   required: ['id', 'title', 'summary', 'steps', 'changes'],
 } as const
 
-export const DONE_DESCRIPTION = 'Mark a finding of the Razbor page as fixed, after its approved solution is applied and checked.'
+export const DONE_DESCRIPTION = 'Mark a finding of the Findings page as fixed, after its approved solution is applied and checked.'
 
 export const DONE_SCHEMA = {
   type: 'object',
@@ -608,7 +608,7 @@ type Words = {
 
 const WORDS: Record<Lang, Words> = {
   en: {
-    head: (id, title) => `Razbor · ${id} "${title}"`,
+    head: (id, title) => `Finding ${id} "${title}"`,
     where: 'Where',
     plain: 'In plain words',
     example: 'Example',
@@ -627,17 +627,17 @@ const WORDS: Record<Lang, Words> = {
     apply: (title, id) => `apply the solution "${title}". When it is done and checked, call ${MARK_FIXED} with id ${id} and say in check how you checked it.`,
     solution: 'Solution',
     leaves: 'Leaves open',
-    deferred: ids => `Razbor: findings ${ids} are set aside by the user. Do not fix or raise them until the user brings them back.`,
-    status: waiting => `Razbor: ${waiting}`,
-    page: url => `Razbor page: ${url}`,
-    down: 'Razbor: the hub does not answer (is docker running?), the page is not updated.',
-    fresh: (count, url) => `Razbor: ${count} new findings. ${url}`,
-    notSent: 'Razbor: the request did not reach the chat, press again',
-    viaChat: 'Razbor: the quick answer failed, the request went to the chat',
-    noFill: 'Razbor: could not put the quote into the prompt box',
+    deferred: ids => `Findings ${ids} are set aside by the user. Do not fix or raise them until the user brings them back.`,
+    status: waiting => `Findings: ${waiting}`,
+    page: url => `Findings page: ${url}`,
+    down: 'Findings: the hub does not answer (is docker running?), the page is not updated.',
+    fresh: (count, url) => `Findings: ${count} new findings. ${url}`,
+    notSent: 'Findings: the request did not reach the chat, press again',
+    viaChat: 'Findings: the quick answer failed, the request went to the chat',
+    noFill: 'Findings: could not put the quote into the prompt box',
   },
   ru: {
-    head: (id, title) => `Разбор · ${id} «${title}»`,
+    head: (id, title) => `Находка ${id} «${title}»`,
     where: 'Где',
     plain: 'По-простому',
     example: 'Пример',
@@ -656,17 +656,17 @@ const WORDS: Record<Lang, Words> = {
     apply: (title, id) => `применяй решение «${title}». Когда закончишь и проверишь, вызови ${MARK_FIXED} с id ${id} и напиши в check, чем проверил.`,
     solution: 'Решение',
     leaves: 'Не закрывает',
-    deferred: ids => `Разбор: находки ${ids} отложены пользователем. Не чини и не поднимай их, пока он сам их не вернёт.`,
-    status: waiting => `Разбор: ${waiting}`,
-    page: url => `Страница «Разбор»: ${url}`,
-    down: 'Разбор: хаб не отвечает (запущен ли docker?), страница не обновлена.',
-    fresh: (count, url) => `Разбор: новых находок — ${count}. ${url}`,
-    notSent: 'Разбор: запрос не ушёл в чат, нажми ещё раз',
-    viaChat: 'Разбор: быстрый ответ не получился, запрос ушёл в чат',
-    noFill: 'Разбор: не получилось вставить цитату в поле ввода',
+    deferred: ids => `Находки ${ids} отложены пользователем. Не чини и не поднимай их, пока он сам их не вернёт.`,
+    status: waiting => `Находки: ${waiting}`,
+    page: url => `Страница «Находки»: ${url}`,
+    down: 'Находки: хаб не отвечает (запущен ли docker?), страница не обновлена.',
+    fresh: (count, url) => `Находки: новых — ${count}. ${url}`,
+    notSent: 'Находки: запрос не ушёл в чат, нажми ещё раз',
+    viaChat: 'Находки: быстрый ответ не получился, запрос ушёл в чат',
+    noFill: 'Находки: не получилось вставить цитату в поле ввода',
   },
   uk: {
-    head: (id, title) => `Розбір · ${id} «${title}»`,
+    head: (id, title) => `Знахідка ${id} «${title}»`,
     where: 'Де',
     plain: 'Простими словами',
     example: 'Приклад',
@@ -685,14 +685,14 @@ const WORDS: Record<Lang, Words> = {
     apply: (title, id) => `застосовуй рішення «${title}». Коли закінчиш і перевіриш, виклич ${MARK_FIXED} з id ${id} і напиши в check, чим перевірив.`,
     solution: 'Рішення',
     leaves: 'Не закриває',
-    deferred: ids => `Розбір: знахідки ${ids} відкладені користувачем. Не лагодь і не піднімай їх, доки він сам їх не поверне.`,
-    status: waiting => `Розбір: ${waiting}`,
-    page: url => `Сторінка «Розбір»: ${url}`,
-    down: 'Розбір: хаб не відповідає (чи запущено docker?), сторінку не оновлено.',
-    fresh: (count, url) => `Розбір: нових знахідок — ${count}. ${url}`,
-    notSent: 'Розбір: запит не пішов у чат, натисни ще раз',
-    viaChat: 'Розбір: швидка відповідь не вдалася, запит пішов у чат',
-    noFill: 'Розбір: не вдалося вставити цитату в поле вводу',
+    deferred: ids => `Знахідки ${ids} відкладені користувачем. Не лагодь і не піднімай їх, доки він сам їх не поверне.`,
+    status: waiting => `Знахідки: ${waiting}`,
+    page: url => `Сторінка «Знахідки»: ${url}`,
+    down: 'Знахідки: хаб не відповідає (чи запущено docker?), сторінку не оновлено.',
+    fresh: (count, url) => `Знахідки: нових — ${count}. ${url}`,
+    notSent: 'Знахідки: запит не пішов у чат, натисни ще раз',
+    viaChat: 'Знахідки: швидка відповідь не вдалася, запит пішов у чат',
+    noFill: 'Знахідки: не вдалося вставити цитату в поле вводу',
   },
 }
 
@@ -729,7 +729,7 @@ const withDeferred = (body: string, deferred: readonly string[], lang: Lang): st
 /** The side question: answered over the session's own transcript, never shown in chat. */
 export const explainPrompt = (finding: Finding, mode: 'simpler' | 'example', note: string, version: number): string =>
   [
-    `Side task for the Razbor page, answer at once and without tools. The user did not understand finding ${finding.id} and asks to explain it again.`,
+    `Side task for the Findings page, answer at once and without tools. The user did not understand finding ${finding.id} and asks to explain it again.`,
     mode === 'simpler'
       ? 'Explain it more simply: short words, one thought, an everyday analogy is fine. Give new steps only if simpler ones help; otherwise leave steps out and the card keeps the ones it shows.'
       : 'Give another live example: a different scenario with other concrete data.',

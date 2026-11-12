@@ -14,7 +14,7 @@ const SOURCE = String.raw`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Разбор</title>
+<title>Находки</title>
 <link rel="stylesheet" href="/hub.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -330,18 +330,18 @@ pre.pre{margin:0;padding:12px 14px;font:12px/1.6 var(--f-mono);overflow-x:auto;w
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer"></aside>
 
-<script>window.RAZBOR_THEME = __THEME__;</script>
+<script>window.FINDINGS_THEME = __THEME__;</script>
 <script type="module">
   try {
     const base = 'https://esm.sh/shiki@__SHIKI__'
     const [core, engine, langs] = await Promise.all([import(base + '/core'), import(base + '/engine/javascript'), import(base + '/langs')])
-    const highlighter = await core.createHighlighterCore({ themes: [window.RAZBOR_THEME], langs: [], engine: engine.createJavaScriptRegexEngine({ forgiving: true }) })
-    window.razborShiki = { highlighter, languages: langs.bundledLanguages }
+    const highlighter = await core.createHighlighterCore({ themes: [window.FINDINGS_THEME], langs: [], engine: engine.createJavaScriptRegexEngine({ forgiving: true }) })
+    window.findingsShiki = { highlighter, languages: langs.bundledLanguages }
   } catch (error) {
-    window.razborShiki = null
-    window.razborShikiError = String(error)
+    window.findingsShiki = null
+    window.findingsShikiError = String(error)
   }
-  window.dispatchEvent(new Event('razbor:shiki'))
+  window.dispatchEvent(new Event('findings:shiki'))
 </script>
 <script src="/hub.js"></script>
 <script>
@@ -350,7 +350,7 @@ pre.pre{margin:0;padding:12px 14px;font:12px/1.6 var(--f-mono);overflow-x:auto;w
 
 var TEXTS = {
   ru: {
-    title: 'Разбор', branch: 'Ветка', found: function (n) { return 'находок: ' + n }, updated: 'обновлено', offline: 'сессия не слушает', hubDown: 'хаб недоступен',
+    title: 'Находки', branch: 'Ветка', found: function (n) { return 'находок: ' + n }, updated: 'обновлено', offline: 'сессия не слушает', hubDown: 'хаб недоступен',
     search: 'Поиск по находкам и файлам…', findings: 'Находки', clear: 'Убрать закрытые',
     groups: { open: 'Ждут тебя', deferred: 'Отложенные', closed: 'Закрытые' },
     groupSub: { open: 'Сначала самые серьёзные', deferred: 'Claude помнит о них в следующих сообщениях', closed: 'Исправленные и снятые' },
@@ -382,11 +382,11 @@ var TEXTS = {
     rule: ['Две и больше находок (ревью, аудит, расследование) Claude показывает здесь через <code>report</code>, а не списком в чате.', 'Каждую объясняет для человека, не читавшего код: без имён классов, с примером из 3–6 шагов с конкретными значениями и шагом, где ломается.', 'Не меняет код, пока ты не нажал «Применить». После правки проверяет и только тогда вызывает <code>mark_fixed</code>.', 'Отложенные находки уходят с каждым твоим сообщением, чтобы Claude их не трогал.'],
     toolsLbl: 'Три инструмента', tools: [['report', 'Показать находки или новое объяснение существующей.'], ['propose_fix', 'Показать решение в карточке. Код не меняется, пока ты не нажмёшь «Применить».'], ['mark_fixed', 'Отметить находку исправленной: только после «Применить», правки и проверки.']],
     seesLbl: 'Что Claude видит сейчас', seesHint: 'Эта строка добавляется к каждому твоему сообщению, пока есть отложенные находки.', seesNone: '(отложенных нет, ничего не добавляется)',
-    deferredLine: function (ids) { return 'Разбор: находки ' + ids + ' отложены пользователем. Не чини и не поднимай их, пока он сам их не вернёт.' },
+    deferredLine: function (ids) { return 'Находки ' + ids + ' отложены пользователем. Не чини и не поднимай их, пока он сам их не вернёт.' },
     close: 'Закрыть', copyPath: 'Скопировать путь'
   },
   en: {
-    title: 'Razbor', branch: 'Branch', found: function (n) { return n + ' findings' }, updated: 'updated', offline: 'session is not listening', hubDown: 'hub is not reachable',
+    title: 'Findings', branch: 'Branch', found: function (n) { return n + ' findings' }, updated: 'updated', offline: 'session is not listening', hubDown: 'hub is not reachable',
     search: 'Search findings and files…', findings: 'Findings', clear: 'Clear closed',
     groups: { open: 'Waiting for you', deferred: 'Set aside', closed: 'Closed' },
     groupSub: { open: 'Most severe first', deferred: 'Claude keeps them in mind in your next messages', closed: 'Fixed and dismissed' },
@@ -418,11 +418,11 @@ var TEXTS = {
     rule: ['Two or more findings (a review, an audit, an investigation) go here through <code>report</code>, not as a list in chat.', 'Each one is explained for a person who has not read the code: no class names, an example of 3–6 steps with concrete values, and the step where it breaks.', 'No code changes until you press "Apply". After the edit Claude checks it, and only then calls <code>mark_fixed</code>.', 'Findings you set aside ride along with every message of yours, so Claude leaves them alone.'],
     toolsLbl: 'Three tools', tools: [['report', 'Show findings, or a new explanation of one.'], ['propose_fix', 'Show a solution in the card. No code changes until you press "Apply".'], ['mark_fixed', 'Mark a finding fixed: only after "Apply", the edit and a check.']],
     seesLbl: 'What Claude sees now', seesHint: 'This line rides along with every message of yours while something is set aside.', seesNone: '(nothing set aside, nothing is added)',
-    deferredLine: function (ids) { return 'Razbor: findings ' + ids + ' are set aside by the user. Do not fix or raise them until the user brings them back.' },
+    deferredLine: function (ids) { return 'Findings ' + ids + ' are set aside by the user. Do not fix or raise them until the user brings them back.' },
     close: 'Close', copyPath: 'Copy the path'
   },
   uk: {
-    title: 'Розбір', branch: 'Гілка', found: function (n) { return 'знахідок: ' + n }, updated: 'оновлено', offline: 'сесія не слухає', hubDown: 'хаб недоступний',
+    title: 'Знахідки', branch: 'Гілка', found: function (n) { return 'знахідок: ' + n }, updated: 'оновлено', offline: 'сесія не слухає', hubDown: 'хаб недоступний',
     search: 'Пошук по знахідках і файлах…', findings: 'Знахідки', clear: 'Прибрати закриті',
     groups: { open: 'Чекають на тебе', deferred: 'Відкладені', closed: 'Закриті' },
     groupSub: { open: 'Спершу найсерйозніші', deferred: 'Claude памʼятає про них у наступних повідомленнях', closed: 'Виправлені й зняті' },
@@ -454,7 +454,7 @@ var TEXTS = {
     rule: ['Дві й більше знахідок (рев’ю, аудит, розслідування) Claude показує тут через <code>report</code>, а не списком у чаті.', 'Кожну пояснює для людини, яка не читала код: без імен класів, з прикладом із 3–6 кроків з конкретними значеннями й кроком, де ламається.', 'Не змінює код, доки ти не натиснув «Застосувати». Після правки перевіряє й лише тоді викликає <code>mark_fixed</code>.', 'Відкладені знахідки йдуть із кожним твоїм повідомленням, щоб Claude їх не чіпав.'],
     toolsLbl: 'Три інструменти', tools: [['report', 'Показати знахідки або нове пояснення існуючої.'], ['propose_fix', 'Показати рішення в картці. Код не змінюється, доки ти не натиснеш «Застосувати».'], ['mark_fixed', 'Позначити знахідку виправленою: лише після «Застосувати», правки й перевірки.']],
     seesLbl: 'Що Claude бачить зараз', seesHint: 'Цей рядок додається до кожного твого повідомлення, доки є відкладені знахідки.', seesNone: '(відкладених немає, нічого не додається)',
-    deferredLine: function (ids) { return 'Розбір: знахідки ' + ids + ' відкладені користувачем. Не лагодь і не піднімай їх, доки він сам їх не поверне.' },
+    deferredLine: function (ids) { return 'Знахідки ' + ids + ' відкладені користувачем. Не лагодь і не піднімай їх, доки він сам їх не поверне.' },
     close: 'Закрити', copyPath: 'Скопіювати шлях'
   }
 }
@@ -589,7 +589,7 @@ function highlight(change) {
   if (shiki.state !== 'ready' || lang === 'text' || !shiki.langs[lang]) return Promise.resolve()
   var load = shiki.loaded[lang] || (shiki.loaded[lang] = shiki.hl.loadLanguage(shiki.langs[lang]))
   return load.then(function () {
-    var lines = shiki.hl.codeToTokensBase(bodyOf(change.diff), { lang: lang, theme: window.RAZBOR_THEME.name })
+    var lines = shiki.hl.codeToTokensBase(bodyOf(change.diff), { lang: lang, theme: window.FINDINGS_THEME.name })
     painted[key] = lines.map(function (line) { return line.map(tokenHTML).join('') })
   }).catch(function () { painted[key] = null })
 }
@@ -608,13 +608,13 @@ function codeHTML(change) {
   var lang = langOf(change.path)
   return '<div class="code" data-key="code-' + esc(codeKey(change).length + ':' + change.path) + '"><div class="bar">' + icon('code', 13) + esc(change.path) + '<span class="lang">' + esc(lang) + '</span></div><div class="lines">' + lines + '</div></div>'
 }
-window.addEventListener('razbor:shiki', function () {
-  var s = window.razborShiki
+window.addEventListener('findings:shiki', function () {
+  var s = window.findingsShiki
   if (!s) { shiki.state = 'failed'; return }
   shiki.hl = s.highlighter; shiki.langs = s.languages; shiki.state = 'ready'
   highlightAll().then(renderAll)
 })
-if (window.razborShiki !== undefined) window.dispatchEvent(new Event('razbor:shiki'))
+if (window.findingsShiki !== undefined) window.dispatchEvent(new Event('findings:shiki'))
 
 /* ---------- drawing ---------- */
 function sevChip(s) { return '<span class="chip" style="color:' + SEVC[s][0] + ';background:' + SEVC[s][1] + '"><span class="mono g-' + s + '">' + SEVG[s] + '</span>' + esc(T().sev[s]) + '</span>' }
@@ -809,7 +809,7 @@ function renderDrawer() {
   var t = T(), ids = inTab('deferred').map(function (f) { return f.id }).join(', ')
   var h = '<header><span class="logo" style="width:32px;height:32px">' + I.code + '</span><h2>' + esc(t.drawerTitle) + '</h2><button class="iconbtn ghost" type="button" data-close aria-label="' + esc(t.close) + '">' + I.x + '</button></header><div class="body">'
   h += '<section class="sec"><span class="lbl">' + esc(t.ruleLbl) + '</span><div class="rule">' + t.rule.map(function (p) { return '<p>' + p + '</p>' }).join('') + '</div></section>'
-  h += '<section class="sec"><span class="lbl">' + esc(t.toolsLbl) + '</span>' + t.tools.map(function (x) { return '<div class="tool"><div class="th"><code>mcp__razbor__' + x[0] + '</code><span>' + esc(x[1]) + '</span></div></div>' }).join('') + '</section>'
+  h += '<section class="sec"><span class="lbl">' + esc(t.toolsLbl) + '</span>' + t.tools.map(function (x) { return '<div class="tool"><div class="th"><code>mcp__findings__' + x[0] + '</code><span>' + esc(x[1]) + '</span></div></div>' }).join('') + '</section>'
   h += '<section class="sec"><span class="lbl">' + esc(t.seesLbl) + '</span><div class="tool"><pre class="pre">' + esc(ids ? t.deferredLine(ids) : t.seesNone) + '</pre></div><p class="hint" style="padding:0">' + esc(t.seesHint) + '</p></section>'
   h += '</div>'
   paint($('drawer'), h)

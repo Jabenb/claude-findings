@@ -1,8 +1,8 @@
-# Razbor for Claude Code
+# Findings for Claude Code
 
 English | [Русский](README.ru.md)
 
-After a review, an audit or an investigation Claude usually leaves a list in chat: "here is a bug, because of this and that". If you have not read that code, such a list says little. Razbor moves the findings to a page in your browser, where each finding is a card you can read on its own:
+After a review, an audit or an investigation Claude usually leaves a list in chat: "here is a bug, because of this and that". If you have not read that code, such a list says little. This mod moves the findings to a page in your browser, where each finding is a card you can read on its own:
 
 - **In plain words**: one or two sentences without class names or jargon.
 - **How it breaks**: a live example of 3-6 steps with real values (an id, a time, an amount, a field and its value), the step where it goes wrong marked red.
@@ -44,7 +44,7 @@ At the prompt of a Claude Code session:
 
 ```
 /plugin install webhub --marketplace jabenb/claude-webhub
-/plugin install razbor --marketplace jabenb/claude-razbor
+/plugin install findings --marketplace jabenb/claude-findings
 ```
 
 From a shell:
@@ -54,7 +54,7 @@ claude plugin install webhub --marketplace jabenb/claude-webhub
 ```
 
 ```bash
-claude plugin install razbor --marketplace jabenb/claude-razbor
+claude plugin install findings --marketplace jabenb/claude-findings
 ```
 
 Add `--scope project` or `--scope local` to both for one repository only. If the mod is already loaded from a folder (`--plugin-dir`, `CLAUDE_CODE_PLUGIN_DIRS` or a session's mods folder), remove that first, or it loads twice.
@@ -62,10 +62,10 @@ Add `--scope project` or `--scope local` to both for one repository only. If the
 ## Use
 
 1. Ask Claude for a review, an audit or an investigation. With two or more findings Claude calls the `report` tool instead of writing a list, and says in one line that the findings are on the page, with its address.
-2. `/razbor` prints the page's address at any time. The hub lists the page under the session's name too, with the number of findings waiting for you.
+2. `/findings` prints the page's address at any time. The hub lists the page under the session's name too, with the number of findings waiting for you.
 3. Work through the cards. A press goes to Claude as a message from you; "Simpler" and "Another example" are answered on the side and never reach the chat, unless the quick answer fails.
 
-The status line shows `Razbor: N` while N findings wait for you.
+The status line shows `Findings: N` while N findings wait for you.
 
 ## Languages
 
@@ -81,22 +81,22 @@ The page never rebuilds what is on screen. Each render is merged into the DOM no
 
 ## How data is kept
 
-Everything lives in `~/.claude/mods-data/razbor/` (inside `$CLAUDE_CONFIG_DIR` when it is set); nothing appears in the project's repository:
+Everything lives in `~/.claude/mods-data/findings/` (inside `$CLAUDE_CONFIG_DIR` when it is set); nothing appears in the project's repository:
 
 - `sessions/<session id>.json`: the session's findings, explanations, solutions and history, so the page comes back after a restart or `--resume`. Files untouched for 30 days are deleted once a day.
 - `projects/<project path>.json`: the findings still waiting for you, per git branch. Another session on the same branch shows them too, marked "From another session"; since that session has not read the code, its requests carry the finding itself.
 
 Findings of a branch deleted locally are forgotten 30 days after anyone last touched them. The hub keeps its own copy of the page's state as well.
 
-Files written by the earlier, pane-based version of the mod are read as they are.
+The mod used to be called Razbor (`razbor`). On its first start it copies the data over from `~/.claude/mods-data/razbor/` when the new folder does not exist yet; files of the earlier pane-based version are read as they are. The tools are now named `mcp__findings__*`.
 
 ## For Claude
 
 The mod adds a rule to the system prompt and three tools:
 
-- `mcp__razbor__report`: show findings, or a new explanation of one (`id`). Concrete values in the example are wrapped in `{{double braces}}` and set apart on the card.
-- `mcp__razbor__propose_fix`: show a solution in the card, before any code changes.
-- `mcp__razbor__mark_fixed`: mark a finding fixed after the edit, with `check`: how it was checked.
+- `mcp__findings__report`: show findings, or a new explanation of one (`id`). Concrete values in the example are wrapped in `{{double braces}}` and set apart on the card.
+- `mcp__findings__propose_fix`: show a solution in the card, before any code changes.
+- `mcp__findings__mark_fixed`: mark a finding fixed after the edit, with `check`: how it was checked.
 
 ## Development
 
@@ -111,12 +111,12 @@ claude plugin test .
 - `hooks/model.ts`: parsing, the state and its changes, the texts of the messages (pure functions).
 - `hooks/register.ts`: the engine and the hub: tools, the listening loop, presses, files.
 - `hooks/page/page.ts`: the whole page; `hooks/page/theme.ts`: Islands Dark.
-- `tests/razbor.test.ts`: the model and the mod end to end, with the hub and the engine held in memory.
+- `tests/findings.test.ts`: the model and the mod end to end, with the hub and the engine held in memory.
 
 ## Uninstall
 
 ```bash
-claude plugin uninstall razbor
+claude plugin uninstall findings
 ```
 
 ## License

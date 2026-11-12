@@ -48,9 +48,9 @@ import {
 import type { Change } from './model'
 import { PAGE } from './page/page'
 
-const TITLE = 'Разбор'
+const TITLE = 'Находки'
 const ICON = '🔎'
-const COMMAND = 'razbor'
+const COMMAND = 'findings'
 const PULL_WAIT_MS = 5000
 const PULL_STUCK_MS = PULL_WAIT_MS + 10_000
 
@@ -88,8 +88,22 @@ const readText = async ($: EngineInterface, path: string): Promise<string> => {
   }
 }
 
-const dataDir = async ($: EngineInterface): Promise<string> =>
-  `${(await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? ''}/.claude`}/mods-data/razbor`
+const modsData = async ($: EngineInterface): Promise<string> => `${(await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${(await $.env.get('HOME')) ?? ''}/.claude`}/mods-data`
+
+const dataDir = async ($: EngineInterface): Promise<string> => `${await modsData($)}/findings`
+
+/** The mod was called razbor before: its data is copied over once, and the old folder is left to the old version. */
+const copyOldData = async ($: EngineInterface): Promise<void> => {
+  try {
+    const base = await modsData($)
+
+    if (!(await $.fs.exists(`${base}/findings`)) && (await $.fs.exists(`${base}/razbor`))) {
+      await $.process.run(['cp', '-R', `${base}/razbor`, `${base}/findings`])
+    }
+  } catch {
+    return
+  }
+}
 
 const git = async ($: EngineInterface, args: string[]): Promise<string> => {
   try {
@@ -432,12 +446,13 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     const result = await next(e)
-    await $.command.register({ name: COMMAND, description: 'Show the address of the Razbor page with the review findings' })
+    await $.command.register({ name: COMMAND, description: 'Show the address of the Findings page with the review findings' })
     await $.tool.register({ name: REPORT_TOOL, description: REPORT_DESCRIPTION, isDeferred: false, inputSchema: REPORT_SCHEMA })
     await $.tool.register({ name: FIX_TOOL, description: FIX_DESCRIPTION, isDeferred: false, inputSchema: FIX_SCHEMA })
     await $.tool.register({ name: DONE_TOOL, description: DONE_DESCRIPTION, isDeferred: false, inputSchema: DONE_SCHEMA })
 
     lang = langOf(await $.store.get('lang'))
+    await copyOldData($)
     await restore($)
     await sweep($)
     await show($)
@@ -450,7 +465,7 @@ export const register: Register = on => {
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
 
-    return { sections: [...composed.sections, { id: 'razbor:guide', text: GUIDE, scope: 'session' }] }
+    return { sections: [...composed.sections, { id: 'findings:guide', text: GUIDE, scope: 'session' }] }
   })
 
   /** What the person set aside rides on their own prompts, so a later "fix everything" skips it. */
@@ -479,13 +494,13 @@ export const register: Register = on => {
     }
 
     const shown = [
-      ...(parsed.added.length > 0 ? [`${parsed.added.length} findings are on the Razbor page (ids ${parsed.added.map(finding => finding.id).join(', ')})`] : []),
+      ...(parsed.added.length > 0 ? [`${parsed.added.length} findings are on the Findings page (ids ${parsed.added.map(finding => finding.id).join(', ')})`] : []),
       ...(parsed.versions.length > 0 ? [`a new explanation is shown for ${parsed.versions.map(version => version.id).join(', ')}`] : []),
     ].join('; ')
 
     return {
       result: isUp
-        ? `${shown}, at ${url}. Do not repeat them in chat: end with one short line saying they are on the Razbor page, with that link.`
+        ? `${shown}, at ${url}. Do not repeat them in chat: end with one short line saying they are on the Findings page, with that link.`
         : `${shown}, but the hub does not answer (is docker running?): the page shows them once the hub is up. Tell the user so in one line.`,
     }
   })
@@ -499,7 +514,7 @@ export const register: Register = on => {
 
     await dispatch($, { op: 'fix', id: parsed.id, fix: parsed.fix, at: await $.clock.now() })
 
-    return { result: `The solution for ${parsed.id} is shown on the Razbor page (${url}). Change no code: end your turn with one short line and wait, the user applies it from the page.` }
+    return { result: `The solution for ${parsed.id} is shown on the Findings page (${url}). Change no code: end your turn with one short line and wait, the user applies it from the page.` }
   })
 
   on('tool.call', { tool: DONE_CALL }, async ($, e) => {
@@ -508,7 +523,7 @@ export const register: Register = on => {
     const check = String(input.check ?? '').trim()
 
     if (findingOf(id) === undefined) {
-      return { deny: `No finding with id "${id}" on the Razbor page.` }
+      return { deny: `No finding with id "${id}" on the Findings page.` }
     }
 
     if (check === '') {
@@ -518,6 +533,6 @@ export const register: Register = on => {
     const at = await $.clock.now()
     await dispatch($, { op: 'status', id, status: 'fixed', check, entry: { at, by: 'claude', what: 'fixed', note: check } })
 
-    return { result: `${id} is marked as fixed on the Razbor page.` }
+    return { result: `${id} is marked as fixed on the Findings page.` }
   })
 }

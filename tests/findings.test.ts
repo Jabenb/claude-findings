@@ -23,11 +23,11 @@ import { PAGE, SHIKI_VERSION } from '../hooks/page/page'
 
 type On = Parameters<TestBody>[1]
 
-const REPORT = 'mcp__razbor__report'
-const PROPOSE_FIX = 'mcp__razbor__propose_fix'
-const MARK_FIXED = 'mcp__razbor__mark_fixed'
+const REPORT = 'mcp__findings__report'
+const PROPOSE_FIX = 'mcp__findings__propose_fix'
+const MARK_FIXED = 'mcp__findings__mark_fixed'
 const HOME = '/home/u'
-const DATA = `${HOME}/.claude/mods-data/razbor`
+const DATA = `${HOME}/.claude/mods-data/findings`
 const OWN = 'aaaaaaaa-1111-2222-3333-444444444444'
 const OTHER = 'bbbbbbbb-1111-2222-3333-444444444444'
 const PROJECT = `${DATA}/projects/w-shop.json`
@@ -106,7 +106,7 @@ const world = (on: On, files: Record<string, string> = {}): World => {
       page: async () => {
         held.pages += 1
 
-        return { isUp: true, url: 'http://localhost:7777/#/s/razbor' }
+        return { isUp: true, url: 'http://localhost:7777/#/s/findings' }
       },
       push: async ({ state, badge }: { state: unknown; badge?: number }) => {
         held.pushed.push(state as State)
@@ -128,7 +128,17 @@ const world = (on: On, files: Record<string, string> = {}): World => {
   on('session.id', () => ({ value: OWN }))
   on('session.root', () => ({ value: '/w/shop' }))
   on('env.get', (_, e) => ({ value: e.name === 'HOME' ? HOME : undefined }))
-  on('process.run', (_, e) => ({ value: { exitCode: 0, stdout: e.argv.includes('rev-parse') ? `${BRANCH}\n` : `${BRANCH}\nmain\n`, stderr: '' } }) as never)
+  on('process.run', (_, e) => {
+    if (e.argv[0] === 'cp') {
+      const [from, to] = [e.argv[2]!, e.argv[3]!]
+      ;[...held.files.entries()].filter(([path]) => path.startsWith(`${from}/`)).forEach(([path, body]) => held.files.set(`${to}${path.slice(from.length)}`, body))
+      held.files.set(to, '')
+
+      return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+    }
+
+    return { value: { exitCode: 0, stdout: e.argv.includes('rev-parse') ? `${BRANCH}\n` : `${BRANCH}\nmain\n`, stderr: '' } } as never
+  })
   on('fs.exists', (_, e) => ({ value: held.files.has(e.path) }))
   on('fs.read', (_, e) => {
     if (!held.files.has(e.path)) {
@@ -313,12 +323,12 @@ test('the page is put in the hub at the start, and reported findings reach it wi
 
   const reported = await call($, REPORT, { findings: [RENAME, REBUILD] })
 
-  expect(String(reported.result)).toMatch(/2 findings are on the Razbor page \(ids R1, R2\), at http:\/\/localhost:7777/)
+  expect(String(reported.result)).toMatch(/2 findings are on the Findings page \(ids R1, R2\), at http:\/\/localhost:7777/)
   expect(shown(held).findings.map(found => [found.id, found.status, found.log[0]?.what])).toEqual([['R1', 'open', 'reported'], ['R2', 'open', 'reported']])
   expect(shown(held).branch).toBe(BRANCH)
   expect(held.badges.at(-1)).toBe(2)
-  expect(held.statuses.at(-1)).toBe('Разбор: 2')
-  expect(held.toasts.at(-1)).toBe('Разбор: новых находок — 2. http://localhost:7777/#/s/razbor')
+  expect(held.statuses.at(-1)).toBe('Находки: 2')
+  expect(held.toasts.at(-1)).toBe('Находки: новых — 2. http://localhost:7777/#/s/findings')
   expect(parseState(held.files.get(SESSION_FILE) ?? '')?.findings).toHaveLength(2)
   expect(project(held).standing.map(entry => [entry.finding.id, entry.branch])).toEqual([['R1', BRANCH], ['R2', BRANCH]])
 })
@@ -356,9 +366,9 @@ test('when the side answer fails the ask goes to chat and comes back through the
   await press({ type: 'example' })
 
   expect(held.submitted).toHaveLength(1)
-  expect(held.submitted[0]!.text).toMatch(/^Разбор · R1 «Окно между деплоем и rename»: Я не понял объяснение\. Дай другой живой пример/)
+  expect(held.submitted[0]!.text).toMatch(/^Находка R1 «Окно между деплоем и rename»: Я не понял объяснение\. Дай другой живой пример/)
   expect(held.submitted[0]!.text).toContain(`${REPORT} с id R1`)
-  expect(held.toasts.at(-1)).toBe('Разбор: быстрый ответ не получился, запрос ушёл в чат')
+  expect(held.toasts.at(-1)).toBe('Находки: быстрый ответ не получился, запрос ушёл в чат')
 
   await call($, REPORT, { findings: [{ id: 'R1', plain: 'Другой случай.', steps: [{ text: 'Отель {{9}} без цен' }, { text: 'Бронь по старой цене', tone: 'bad' }] }] })
   expect(one(held, 'R1').versions.at(-1)?.plain).toBe('Другой случай.')
@@ -372,11 +382,11 @@ test('a deferred finding leaves the badge, stays for the branch and rides on the
 
   expect(one(held, 'R1').status).toBe('deferred')
   expect(held.badges.at(-1)).toBe(1)
-  expect(held.statuses.at(-1)).toBe('Разбор: 1')
+  expect(held.statuses.at(-1)).toBe('Находки: 1')
   expect(project(held).standing.map(entry => [entry.finding.id, entry.finding.status])).toEqual([['R1', 'deferred'], ['R2', 'open']])
 
   await $.prompt.submit({ text: 'почини всё', wait: false, origin: { kind: 'composer' } })
-  expect(held.submitted.at(-1)).toEqual({ text: 'почини всё', context: ['Разбор: находки R1 отложены пользователем. Не чини и не поднимай их, пока он сам их не вернёт.'] })
+  expect(held.submitted.at(-1)).toEqual({ text: 'почини всё', context: ['Находки R1 отложены пользователем. Не чини и не поднимай их, пока он сам их не вернёт.'] })
 
   await press({ type: 'restore' })
   expect(one(held, 'R1').status).toBe('open')
@@ -389,7 +399,7 @@ test('"fix" asks for a solution first, shows it on the card, and edits only afte
   await press({ type: 'fix', note: 'без миграций' })
 
   expect(held.submitted[0]!.text).toBe(
-    `Разбор · R1 «Окно между деплоем и rename»: предложи решение. Моё уточнение: без миграций Код пока не меняй. Вызови ${PROPOSE_FIX}: что поменяется простыми словами, тот же живой пример после фикса, дифф по файлам и что решение не закрывает.`,
+    `Находка R1 «Окно между деплоем и rename»: предложи решение. Моё уточнение: без миграций Код пока не меняй. Вызови ${PROPOSE_FIX}: что поменяется простыми словами, тот же живой пример после фикса, дифф по файлам и что решение не закрывает.`,
   )
   expect(one(held, 'R1').status).toBe('fixing')
 
@@ -403,7 +413,7 @@ test('"fix" asks for a solution first, shows it on the card, and edits only afte
 
   await press({ type: 'apply' })
   expect(held.submitted[1]!.text).toBe(
-    `Разбор · R1 «Окно между деплоем и rename»: применяй решение «Искать под обоими именами». Когда закончишь и проверишь, вызови ${MARK_FIXED} с id R1 и напиши в check, чем проверил.`,
+    `Находка R1 «Окно между деплоем и rename»: применяй решение «Искать под обоими именами». Когда закончишь и проверишь, вызови ${MARK_FIXED} с id R1 и напиши в check, чем проверил.`,
   )
   expect(project(held).standing.map(entry => entry.finding.status)).toEqual(['proposed'])
 
@@ -420,7 +430,7 @@ test('"another option" names the solutions already seen, and the language of the
   await call($, PROPOSE_FIX, FIX)
 
   await press({ type: 'another', lang: 'en' })
-  expect(held.submitted[0]!.text).toMatch(/^Razbor · R1 "Окно между деплоем и rename": propose a different solution, not like «Искать под обоими именами»\. Do not change the code yet/)
+  expect(held.submitted[0]!.text).toMatch(/^Finding R1 "Окно между деплоем и rename": propose a different solution, not like «Искать под обоими именами»\. Do not change the code yet/)
 
   await call($, PROPOSE_FIX, { ...FIX, title: 'Запускать rename в деплое' })
   expect(one(held, 'R1').fixes.map(fix => fix.title)).toEqual(['Искать под обоими именами', 'Запускать rename в деплое'])
@@ -445,7 +455,7 @@ test('a fix asked for a finding of another session carries the finding itself', 
   const carried = finding('R5', { title: 'Сбой отеля', isCarried: true })
 
   expect(fixAsk(carried, '', ['R2'], 'ru')).toContain('Это находка из прошлой сессии на этой ветке, ты её ещё не видел. Вот она целиком:\nR5 [high] Сбой отеля')
-  expect(fixAsk(carried, '', ['R2'], 'ru')).toMatch(/Разбор: находки R2 отложены пользователем/)
+  expect(fixAsk(carried, '', ['R2'], 'ru')).toMatch(/Находки R2 отложены пользователем/)
 })
 
 test('a new session of the branch shows what the last one left, and asks about it through chat', async ($, on) => {
@@ -466,4 +476,14 @@ test('a new session of the branch shows what the last one left, and asks about i
 
   const reported = await call($, REPORT, { findings: [RENAME] })
   expect(String(reported.result)).toMatch(/ids R7\)/)
+})
+
+test('the data of the mod under its old name is copied over once, and its findings come back', async ($, on) => {
+  const old = `${HOME}/.claude/mods-data/razbor`
+  const saved = { ...EMPTY, branch: BRANCH, findings: [finding('R3', { title: 'Старая находка' })] }
+  const { held } = await started($, on, { [old]: '', [`${old}/sessions/${OWN}.json`]: JSON.stringify(saved) })
+
+  expect(held.files.has(SESSION_FILE)).toBe(true)
+  expect(held.files.has(`${old}/sessions/${OWN}.json`)).toBe(true)
+  expect(shown(held).findings.map(found => found.title)).toEqual(['Старая находка'])
 })
